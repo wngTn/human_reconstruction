@@ -2,6 +2,17 @@
 # at3dcv_project
 Repository for the Project of Advanced Topics in 3D Computer Vision
 
+## Uploading To Nextcloud Repository ##
+
+Use the script provided in `scripts/cloudsend.sh` to upload data into the nextcloud repository.\
+Make sure to make the script executable if you are on *nix machine.
+
+Example:
+```bash
+# Upload the folder/file <data> to the nextcloud repository
+ ./scripts/cloudsend.sh -p 'fcanys2333' '<data>' 'https://nextcloud.in.tum.de/index.php/s/RjdwM59XHAkWkMC'
+```
+
 # [DeepMultiCap: Performance Capture of Multiple Characters Using Sparse Multiview Cameras (ICCV 2021)](http://www.liuyebin.com/dmc/dmc.html)
 [Yang Zheng*](https://y-zheng18.github.io/zy.github.io/), Ruizhi Shao*, [Yuxiang Zhang](https://zhangyux15.github.io/), [Tao Yu](http://ytrock.com/), [Zerong Zheng](http://zhengzerong.github.io/), [Qionghai Dai](http://media.au.tsinghua.edu.cn/english/team/qhdai.html), [Yebin Liu](http://www.liuyebin.com/).
 
