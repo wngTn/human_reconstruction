@@ -6,9 +6,10 @@ batch_size: 1
 infer: True
 infer_reverse: True
 
-# data
-num_views: 4
-yaw_list: [0, 90, 180, 270]
+# data 
+num_views: 6
+yaw_list: [0, 60, 120, 180, 240, 300]
+# [0, 90, 180, 270]
 flip_x: False
 
 # network
@@ -22,6 +23,8 @@ load_netN_checkpoint_path: checkpoints/demo/netN_latest
 
 # smpl
 smpl_faces: lib/data/smplx_multi.obj
+# smplx_correction.obj
+# smplx_fine.obj      ### -> error: indexes dont match
 
 # marching cube
 resolution: 512
