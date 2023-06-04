@@ -35,6 +35,8 @@ Install remaining requirements:
 `python3 -m pip install pyrender`
 `python setup.py develop`
 
+Convert Dataset into easymocap format:
+`python scripts/convert_params.py -i data/Synthetic/first_trial/camera_info.json -o data/Synthetic/first_trial_easymocap -d data/Synthetic/first_trial -f 30`
 
 
 
