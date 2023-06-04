@@ -15,7 +15,7 @@ Example:
 
 ## Installing EasyMocap ##
 Download SMPL models:
-`pip install gdown`
+`pip install gdown wget`
 `python scripts/download.py`
 
 Prepare your Conda environment:
