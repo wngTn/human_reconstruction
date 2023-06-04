@@ -61,6 +61,9 @@ def render_smpl_global_normal(dataroot, obj_path, faces_path, res=(1024, 1024), 
         for angle in angles:
             intrinsic = np.load(os.path.join(parameter_path, obj_name, '{}_intrinsic.npy'.format(angle)))
             extrinsic = np.load(os.path.join(parameter_path, obj_name, '{}_extrinsic.npy'.format(angle)))
+        # for i in range(len(angles)):
+            # intrinsic = np.load(os.path.join(parameter_path, obj_name, '{}_intrinsic.npy'.format(i)))
+            # extrinsic = np.load(os.path.join(parameter_path, obj_name, '{}_extrinsic.npy'.format(i)))
             
             if flip_y:
                 camera.set_intrinsic(fx=intrinsic[0, 0], fy=-intrinsic[1, 1], cx=intrinsic[0, 2], cy=res[0]-intrinsic[1, 2])
@@ -79,6 +82,7 @@ def render_smpl_global_normal(dataroot, obj_path, faces_path, res=(1024, 1024), 
             scene.render()
             
             ti.imwrite( (camera.img.to_numpy() + 1)/2, os.path.join(pos_save_path, '{}.jpg'.format(angle)))
+            # ti.imwrite( (camera.img.to_numpy() + 1)/2, os.path.join(pos_save_path, '{}.jpg'.format(i)))
 
 
 if __name__ == '__main__':
@@ -89,7 +93,7 @@ if __name__ == '__main__':
     parser.add_argument("--dataroot", type=str)
     parser.add_argument("--obj_path", type=str)
     parser.add_argument("--faces_path", type=str)
-    parser.add_argument("--yaw_list", type=int, nargs='+', default=[i for i in range(360)])
+    parser.add_argument("--yaw_list", type=int, nargs='+', default=[i for i in range(0, 360, 60)])
     parser.add_argument("--flip_y", action="store_true")
     parser.add_argument("--flip_normal", action="store_true")
     args = parser.parse_args()

@@ -65,7 +65,7 @@ def gen_mesh_dmc(opt, net, cuda, data, save_path, use_octree=True, threshold=0.5
         color = color * 0.5 + 0.5
         save_obj_mesh_with_color(save_path, verts, faces, color)
     except Exception as e:
-        print(e)
+        print("Yo, something went wrong", e)
 
 
 def reconstruction_3d(net, cuda, calib_tensor, extrinsic, 

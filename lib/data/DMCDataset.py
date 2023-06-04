@@ -30,7 +30,7 @@ class DMCDataset(Dataset):
 
     def __init__(self, opt, cache_data, cache_data_lock, phase='train', yaw_list=range(0, 360, 6), num_views=None):
         self.opt = opt
-        self.projection_mode = 'percpective'
+        self.projection_mode = 'perspective'
         self.phase = phase
         # Path setup
         self.root = self.opt.dataroot
@@ -144,6 +144,7 @@ class DMCDataset(Dataset):
         ero_mask_list = []
 
         for vid in view_ids:
+        # for vid in range(len(view_ids)):
             extrinsic_path = os.path.join(self.PARAM, subject, '{}_extrinsic.npy'.format(vid))
             intrinsic_path = os.path.join(self.PARAM, subject, '{}_intrinsic.npy'.format(vid))
             render_path = os.path.join(self.RENDER, subject, '{}.jpg'.format(vid))
@@ -270,6 +271,8 @@ class DMCDataset(Dataset):
                     for i, img in enumerate(imgs_list):
                         if i == 4:
                             fill_n = (128, 128, 128)
+                        elif i == 1:
+                            fill_n = 0
                         else:
                             fill_n = (0, 0, 0)
                         img = ImageOps.expand(img, 256, fill=fill_n)
@@ -539,7 +542,7 @@ class DMCDataset(Dataset):
         subject = self.subjects[sid]
         res = {
             'name': subject,
-            'mesh_path': os.path.join(self.OBJ, subject, subject + '.obj'),
+            'mesh_path': os.path.join(self.OBJ, subject, subject + '.obj'),         ## --> ? never used
             'sid': sid,
             'yid': yid,
         }
