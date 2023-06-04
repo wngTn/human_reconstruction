@@ -13,6 +13,31 @@ Example:
  ./scripts/cloudsend.sh -p 'fcanys2333' '<data>' 'https://nextcloud.in.tum.de/index.php/s/RjdwM59XHAkWkMC'
 ```
 
+## Installing EasyMocap ##
+Download SMPL models:
+`pip install gdown`
+`python scripts/download.py`
+
+Prepare your Conda environment:
+`conda create -n easymocap python=3.9 -y`
+`conda activate easymocap`
+
+Install appropriate torch and torchvision version:
+`pip install torch==1.13.1+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+`
+
+`pip install torchvision==0.14.1+cu117 -f https://download.pytorch.org/whl/torch_stable.html`
+
+
+Install remaining requirements:
+`cd external/EasyMocap-master`
+`python -m pip install -r requirements.txt`
+`python3 -m pip install pyrender`
+`python setup.py develop`
+
+
+
+
 # [DeepMultiCap: Performance Capture of Multiple Characters Using Sparse Multiview Cameras (ICCV 2021)](http://www.liuyebin.com/dmc/dmc.html)
 [Yang Zheng*](https://y-zheng18.github.io/zy.github.io/), Ruizhi Shao*, [Yuxiang Zhang](https://zhangyux15.github.io/), [Tao Yu](http://ytrock.com/), [Zerong Zheng](http://zhengzerong.github.io/), [Qionghai Dai](http://media.au.tsinghua.edu.cn/english/team/qhdai.html), [Yebin Liu](http://www.liuyebin.com/).
 
