@@ -36,8 +36,6 @@ for i in range(4):
 smpl = o3d.io.read_triangle_mesh("meetings/week_3/0.obj")
 smpl.compute_vertex_normals()
 
-o3d.io.write_point_cloud("pcd.ply", pcd)
-
 app = gui.Application.instance
 app.initialize()
 vis = o3d.visualization.O3DVisualizer("Open3D - 3D Text", 1024, 768)
