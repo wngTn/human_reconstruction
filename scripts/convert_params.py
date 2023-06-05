@@ -8,60 +8,49 @@ import glob
 from tqdm import tqdm
 import re
 
+def get_rotation_matrix(T):
+    return T[:3, :3].flatten().tolist()
+
+def get_translation_vector(T):
+    return T[:3, 3].tolist()
+
+def conversion(input_json_file):
+    # Load the JSON data
+    with open(input_json_file, 'r') as json_file:
+        data = json.load(json_file)
+
+    # Write the intrinsic camera parameters to YAML
+    with open('intri.yml', 'w') as intri_file:
+        intrinsics = {
+            "names": ["0", "1", "2", "3"],
+            "K_0": {"rows": 3, "cols": 3, "dt": 'd', "data": [data['cam_mat_intr']['f_x'], 0., data['cam_mat_intr']['c_x'], 0., data['cam_mat_intr']['f_y'], data['cam_mat_intr']['c_y'], 0., 0., 1. ]},
+            "dist_0": {"rows": 5, "cols": 1, "dt": 'd', "data": [0]*5}, # Assuming zero distortion
+        }
+
+        yaml.dump(intrinsics, intri_file, default_flow_style=False)
+
+    # Write the extrinsic camera parameters to YAML
+    with open('extri.yml', 'w') as extri_file:
+        extrinsics = {
+            "names": ["0", "1", "2", "3"],
+        }
+
+        for i in range(4):
+            T = np.array(data['cam_mat_extr']['cam_T_' + str(i)])
+            R = get_rotation_matrix(T)
+            t = get_translation_vector(T)
+
+            extrinsics['R_' + str(i)] = {"rows": 3, "cols": 3, "dt": 'd', "data": R}
+            extrinsics['T_' + str(i)] = {"rows": 3, "cols": 1, "dt": 'd', "data": t}
+
+        yaml.dump(extrinsics, extri_file, default_flow_style=False)
+
 
 def convert(input_json_file, output_dir, image_dir, fps):
-    # load json data
-    with open(input_json_file, "r") as read_file:
-        data = json.load(read_file)
 
-    intr = {}
-    intr["%YAML:1.0"] = None
-    intr["names"] = [str(i) for i in range(4)]
-    for i in range(4):
-        intr[f"K_{i}"] = {
-            "rows": 3,
-            "cols": 3,
-            "dt": "d",
-            "data": [data["cam_mat_intr"]["f_x"], 0, data["cam_mat_intr"]["c_x"], 0, data["cam_mat_intr"]["f_y"], data["cam_mat_intr"]["c_y"], 0, 0, 1]
-        }
-        intr[f"dist_{i}"] = {
-            "rows": 5,
-            "cols": 1,
-            "dt": "d",
-            "data": [0, 0, 0, 0, 0]
-        }
-
-    extr = {}
-    extr["%YAML:1.0"] = None
-    extr["names"] = [str(i) for i in range(4)]
-    
-    for i in range(4):
-        extr[f"R_{i}"] = {
-            "rows": 3,
-            "cols": 1,
-            "dt": "d",
-            "data": np.eye(3).ravel().tolist()
-        }
-        extr[f"Rot_{i}"] = {
-            "rows": 3,
-            "cols": 3,
-            "dt": "d",
-            "data": np.array(data["cam_mat_extr"][f"cam_T_{i}"])[:3, :3].ravel().tolist()
-        }
-        extr[f"T_{i}"] = {
-            "rows": 3,
-            "cols": 1,
-            "dt": "d",
-            "data": np.array(data["cam_mat_extr"][f"cam_T_{i}"])[:3, 3].ravel().tolist()
-        }
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    with open(os.path.join(output_dir, "intri.yml"), 'w') as yaml_file:
-        yaml.dump(intr, yaml_file, default_flow_style=False)
-
-    with open(os.path.join(output_dir, "extri.yml"), 'w') as yaml_file:
-        yaml.dump(extr, yaml_file, default_flow_style=False)
+    # Load JSON file
+    # convert json to YAMLs
+    conversion(input_json_file)
 
     video_dir = os.path.join(output_dir, 'videos')
     if not os.path.exists(video_dir):
