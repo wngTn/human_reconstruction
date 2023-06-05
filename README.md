@@ -1,6 +1,69 @@
 # Advanced Topics in 3D Computer Vision
 Repository for the Project of Advanced Topics in 3D Computer Vision
 
+# File Structure #
+
+```
+.
+├── README.md
+├── apps
+│   ├── eval_3d.py
+│   ├── train_dmc.py
+│   └── train_normal_net.py
+├── assets
+│   ├── obj
+│   ├── smplx
+│   ├── teaser.jpg
+│   └── tex
+├── binvox (not necessary, needed for creating obj3d files)
+├── checkpoints # model checkpoints
+│   └── demo
+├── configs
+│   ├── dmc_demo.yaml
+│   ├── dmc_train.yaml
+│   └── normal_train.yaml
+├── data # Your datasets
+│   ├── Synthetic 
+│   └── demo
+├── demo.sh
+├── external
+│   ├── EasyMocap-master
+│   └── __init__.py
+├── lib
+│   ├── __init__.py
+│   ├── __pycache__
+│   ├── data
+│   ├── ext_transform.py
+│   ├── geometry.py
+│   ├── loss_util.py
+│   ├── mesh_util.py
+│   ├── model
+│   ├── net_util.py
+│   ├── options.py
+│   ├── sample_util.py
+│   ├── sdf.py
+│   ├── smpl_util.py
+│   └── train_util.py
+├── meetings # this is used if you 
+│   └── week_3
+├── render_dataset.sh
+├── render_two.sh
+├── results
+│   └── dmc_demo
+├── scripts
+│   ├── cloudsend.sh
+│   ├── convert_params.py
+│   ├── download.py
+│   └── vis.py
+├── taichi_render_gpu
+│   ├── README.md
+│   ├── render_multi.py
+│   ├── render_smpl.py
+│   ├── setup.py
+│   └── taichi_three
+└── train.sh
+```
+
 ## Uploading To Nextcloud Repository ##
 
 Use the script provided in `scripts/cloudsend.sh` to upload data into the nextcloud repository.\
