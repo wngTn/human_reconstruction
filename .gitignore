@@ -77,6 +77,8 @@ instance/
 # Sphinx documentation
 docs/_build/
 
+# PyBuilder
+.pybuilder/
 target/
 
 # Jupyter Notebook
@@ -86,4 +88,3 @@ target/
 profile_default/
 ipython_config.py
 
-# pyenv

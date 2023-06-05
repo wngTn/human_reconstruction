@@ -1,5 +1,4 @@
-
-# at3dcv_project
+# Advanced Topics in 3D Computer Vision
 Repository for the Project of Advanced Topics in 3D Computer Vision
 
 ## Uploading To Nextcloud Repository ##
@@ -13,30 +12,66 @@ Example:
  ./scripts/cloudsend.sh -p 'fcanys2333' '<data>' 'https://nextcloud.in.tum.de/index.php/s/RjdwM59XHAkWkMC'
 ```
 
-## Installing EasyMocap ##
+# Installing EasyMocap #
 Download SMPL models:
-`pip install gdown wget`
-`python scripts/download.py`
+```
+pip install gdown wget
+# You might need to rename the HrNet weight file
+python scripts/download.py
+```
 
-Prepare your Conda environment:
-`conda create -n easymocap python=3.9 -y`
-`conda activate easymocap`
+Prepare your Conda environment (if necessary):
+```
+conda create -n easymocap python=3.9 -y
+conda activate easymocap
+```
 
 Install appropriate torch and torchvision version:
-`pip install torch==1.13.1+cu117 -f https://download.pytorch.org/whl/torch_stable.html
-`
-
-`pip install torchvision==0.14.1+cu117 -f https://download.pytorch.org/whl/torch_stable.html`
+```
+pip install torch==1.13.1+cu117 -f https://download.pytorch.org/whl/torch_stable.html`
+pip install torchvision==0.14.1+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+```
 
 
 Install remaining requirements:
-`cd external/EasyMocap-master`
-`python -m pip install -r requirements.txt`
-`python3 -m pip install pyrender`
-`python setup.py develop`
+```
+cd external/EasyMocap-master
+python -m pip install -r requirements.txt
+python3 -m pip install pyrender
+python setup.py develop
+```
 
-Convert Dataset into easymocap format:
-`python scripts/convert_params.py -i data/Synthetic/first_trial/camera_info.json -o data/Synthetic/first_trial_easymocap -d data/Synthetic/first_trial -f 30`
+Convert Dataset into easymocap format (extri and intri still bugged):
+```
+python scripts/convert_params.py -i data/Synthetic/first_trial/camera_info.json -o data/Synthetic/first_trial_easymocap -d data/Synthetic/first_trial -f 30
+```
+
+Extract the images from videos:
+```
+data=/path/to/data
+python scripts/preprocess/extract_video.py ${data} --no2d
+```
+
+Create 2D keypoints:
+```
+python apps/preprocess/extract_keypoints.py ${data} --mode yolo-hrnet
+```
+
+Create 3D keypoints:
+```
+python3 apps/demo/mvmp.py ${data} --out ${data}/output --annot annots --cfg config/exp/mvmp1f.yml --undis --vis_det --vis_repro
+```
+
+Track 3D keypoints:
+```
+python3 apps/demo/auto_track.py ${data}/output ${data}/output-track --track3d
+```
+
+Fit SMPL model:
+```
+python3 apps/demo/smpl_from_keypoints.py ${data} --skel ${data}/output-track/keypoints3d --out ${data}/output-track/smpl --verbose --opts smooth_poses 1e1
+```
+
 
 
 
@@ -95,4 +130,3 @@ booktitle={IEEE Conference on Computer Vision (ICCV 2021)},
 year={2021},
 }
 ```
-=======

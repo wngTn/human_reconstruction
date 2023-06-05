@@ -1,7 +1,7 @@
 import gdown
 import wget
 
-SMPL_MODEL_PATH = "external/EasyMocap-master/data/bodymodels/smpl/models"
+SMPL_MODEL_PATH = "external/EasyMocap-master/data/smplx/smpl/"
 YOLOV4_NET_PATH = "external/EasyMocap-master/data/models/"
 HRNET_PATH = "external/EasyMocap-master/data/models/"
 
@@ -16,7 +16,7 @@ try:
         url="https://drive.google.com/file/d/1UoJhTtjHNByZSm96W3yFTfU5upJnsKiS/view?usp=sharing",
         quiet=False,
         fuzzy=True,
-        output=YOLOV4_NET_PATH
+        output=HRNET_PATH
     ) 
     wget.download("https://github.com/AlexeyAB/darknet/releases/download/darknet_yolo_v3_optimal/yolov4.weights", 
                   out=YOLOV4_NET_PATH)
