@@ -23,4 +23,4 @@ DATASETS:
   TRAIN: ("demo_train",)
   TEST: ("synthetic_first_trial",)      ### --> custom
   # TEST: ("test_val",)
-OUTPUT_DIR: "../../data/Synthetic/first_trial/det2_pre"     ### --> custom
+OUTPUT_DIR: "data/synthetic_first_trial/detectron_2_prediction"     ### --> custom

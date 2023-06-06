@@ -52,21 +52,12 @@ register_coco_instances("demo_val", {}, "../../demo/annotations/demo_val.json",
                         "../../demo/img")
 
 # register my custom coco instances
-## ?
-register_coco_instances("test_val", {}, "../../data/TestDataset/msrcnn_finetune_annotations/Demo.json",
-                        "F:/SS23/AT3DCV/at3dcv_project/humanParsing/Self-Correction-Human-Parsing/mhp_extension/data/TestDataset/global_pic")
-                        # "F:/SS23/AT3DCV/MHDataset/MultiHumanDataset/Real-World-Capture/zyx_single/img")
-## Test_3
-register_coco_instances("test_3_val", {}, "../../data/Test3Dataset/annotations/Demo.json",
-                        "F:/SS23/AT3DCV/at3dcv_project/humanParsing/Self-Correction-Human-Parsing/mhp_extension/data/Test3Dataset/global_pic")
-                        # "F:/SS23/AT3DCV/MHDataset/MultiHumanDataset/Real-World-Capture/three/person0/img")
-## Test_Single
-register_coco_instances("test_single_val", {}, "../../data/TestSingleDataset/annotations/Demo.json",
-                        "F:/SS23/AT3DCV/at3dcv_project/humanParsing/Self-Correction-Human-Parsing/mhp_extension/data/TestSingleDataset/global_pic")
-    
-## Synthetic / first_trial
-register_coco_instances("synthetic_first_trial", {}, "data/Synthetic/first_trial/annotations/Demo.json",
-                        "F:/SS23/AT3DCV/at3dcv_project/data/Synthetic/first_trial")
+# Register Custom Dataset
+def register_datasets(data_dict):
+    import warnings
+    warnings.warn("Using Hard Coded Code")
+    for dataset_name, (annotation_path, image_dir) in data_dict.items():
+        register_coco_instances(dataset_name, {}, annotation_path, image_dir)
     
 
 class Trainer(DefaultTrainer):
@@ -188,6 +179,13 @@ def main(args):
 
 
 if __name__ == "__main__":
+    # Hard coded cuz lel
+    data_dict = {
+       "synthetic_first_trial" : ("data/synthetic_first_trial/annotations/synthetic_first_trial.json", "data/synthetic_first_trial/global_pic")
+    }
+    print("Warning, HARD CODED")
+    print("Registering:", data_dict)
+    register_datasets(data_dict)
     args = default_argument_parser().parse_args()
     print("Command Line Args:", args)
     launch(
