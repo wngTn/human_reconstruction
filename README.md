@@ -34,7 +34,6 @@ Repository for the Project of Advanced Topics in 3D Computer Vision
 │   └── __init__.py
 ├── lib
 │   ├── __init__.py
-│   ├── __pycache__
 │   ├── data
 │   ├── ext_transform.py
 │   ├── geometry.py
@@ -122,9 +121,9 @@ python apps/eval_3d.py --config configs/multihuman_single.yaml --dataroot data/m
 
 We use [this repository](https://github.com/GoGoDuck912/Self-Correction-Human-Parsing) for generating the masks.
 
-1. Follow the installment steps from the github repository (difficult lel)
+1. Follow the installment steps from the github repository, including [detectron2](https://github.com/facebookresearch/detectron2/blob/main/INSTALL.md) for the multiple human parsing framework.
 2. Make sure that the Synthetic data is under `data/Synthetic/<first_trial>`
-3. Make sure that all images are in the same folder
+3. Make sure that all images to be parsed are in the same folder
 ```
 cd external/Self-Correction-Human-Parsing
 python process.py -src_img ../../data/Synthetic/first_trial -dst_img mhp_extension/data/synthetic_first_trial/global_pic
@@ -148,7 +147,7 @@ python finetune_net.py --num-gpus 1 --config-file configs/Misc/synthetic_first_t
 python make_crop_and_mask_w_mask_nms.py --img_dir "./data/synthetic_first_trial/global_pic" --save_dir "./data/synthetic_first_trial" --img_list "./data/synthetic_first_trial/annotations/synthetic_first_trial.json" --det_res "./data/synthetic_first_trial/detectron_2_prediction/inference/instances_predictions.pth"
 ```
 
-7. Generate txt files for images in `global pic` and `crop_pic`
+7. Generate txt files for images in `global_pic` and `crop_pic`
 
 ```
 python generate_txt_file.py --folder_path "data/synthetic_first_trial/global_pic" --txt_file_name "global_pic.txt"
