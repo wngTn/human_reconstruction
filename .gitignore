@@ -1,6 +1,10 @@
 data/*
 !data/demo
 
+external/Self-Correction-Human-Parsing/mhp_extension/data/*
+external/Self-Correction-Human-Parsing/checkpoints/*
+external/Self-Correction-Human-Parsing/mhp_extension/pretrain_model/*
+
 binvox
 results/*
 checkpoints/*

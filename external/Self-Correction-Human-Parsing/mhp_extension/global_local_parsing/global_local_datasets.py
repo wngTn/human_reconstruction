@@ -167,7 +167,12 @@ class CropDataValSet(data.Dataset):
     def __getitem__(self, index):
         val_item = self.val_list[index]
         # Load training image
-        im_path = os.path.join(self.root, self.split_name, val_item + '.png')
+        if os.path.exists(os.path.join(self.root, self.split_name, val_item + '.png')):
+            im_path = os.path.join(self.root, self.split_name, val_item + '.png')
+        elif os.path.exists(os.path.join(self.root, self.split_name, val_item + '.jpg')):
+            im_path = os.path.join(self.root, self.split_name, val_item + '.jpg')
+        else:
+            raise ValueError(f"No approriate file found in {os.path.join(self.root, self.split_name)}")
         print(im_path)
         im = cv2.imread(im_path, cv2.IMREAD_COLOR)
         h, w, _ = im.shape

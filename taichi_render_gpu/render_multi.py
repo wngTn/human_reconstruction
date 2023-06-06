@@ -90,8 +90,11 @@ class StaticRenderer:
             light = t3.Light(dir, color=[1.0, 1.0, 1.0])
             self.scene.add_light(light)
 
-def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path, res=(1024, 1024), enable_gpu=False, dis_scale=1, 
+def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path, num_angles, res=(1024, 1024), enable_gpu=False,  dis_scale=1, 
     ran_mask_num = 0):
+    if enable_gpu:
+        ti.init(ti.gpu)
+        print("Enabled gpu")
     # obj_path = os.path.join(data_path, data_id, 'NORMAL.obj')
     # obj_path = os.path.join(data_path, data_id, data_id+'.obj') 
 
@@ -102,9 +105,6 @@ def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path,
     # obj_path = os.path.join(data_path, obj_id, obj_id+'.obj')
     img_file_list = os.listdir(texture_path)
     img_id = img_file_list[data_id]
-    # 
-    # changes tony
-    obj_path_unnormalized = os.path.join(texture_path, img_id, 'NORMAL.obj')
     obj_path = os.path.join(data_path, obj_id, obj_id + '.obj') 
     img_path = os.path.join(texture_path, img_id, 'NORMAL_u1_v1.png')
 
@@ -135,17 +135,8 @@ def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path,
     if not os.path.exists(depth_save_path):
         os.makedirs(depth_save_path)
 
-    # import ipdb; ipdb.set_trace()
     texture = ti.imread(img_path)
-    # obj doesn't have vertex texture information
-    # obj = t3.readobj(obj_path, scale=1)
-    # reading vertex texture information from unnormalized file
-    obj = t3.readobj(obj_path_unnormalized, scale=1)
-    # import ipdb; ipdb.set_trace()
-    # adding vertex texture to normalized file
-    # obj['vt'] = obj_unnormalized['vt']
-    # delete unnormalized object
-    # del obj_unnormalized
+    obj = t3.readobj(obj_path, scale=1)
     
     if len(renderer.scene.models) >= 1:
         renderer.modify_model(0, obj, texture)
@@ -191,8 +182,7 @@ def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path,
         renderer.scene.models[i].modify_color(b_color)
 
     angle_mul = 1
-    # for angle in tqdm(range(360), desc='angle'):
-    for angle in tqdm(range(0, 360, 60), desc='angle'):
+    for angle in tqdm(range(0, 360, 360 // num_angles), desc='angle'):
         for i in range(ran_mask_num + 1):
             renderer.scene.models[i].type[None] = 0
         # if (os.path.exists(os.path.join(img_save_path, '{}.jpg'.format(angle)))):
@@ -270,6 +260,8 @@ if __name__ == '__main__':
     parser.add_argument("--texture_root", type=str)
     parser.add_argument("--save_path", type=str)
     parser.add_argument("--ran_mask_num", type=int, default=0)
+    parser.add_argument("--num_angles", type=int, default=4, help="Renders the image from num_angles views uniformly")
+    parser.add_argument("--enable_gpu", action="store_true")
     args = parser.parse_args()
     data_root = args.data_root
     texture_root = args.texture_root
@@ -280,7 +272,7 @@ if __name__ == '__main__':
     renderer = StaticRenderer()
     for data_id in tqdm(range(len(os.listdir(data_root))), desc='data_id'):
     # for ind in tqdm(len(os.listdir(data_root))):
-        render_mv_random_mask(renderer, data_root, texture_root, data_id, save_path, res, False, dis_scale=2, ran_mask_num=ran_mask_num)
+        render_mv_random_mask(renderer, data_root, texture_root, data_id, save_path, args.num_angles, res, args.enable_gpu, dis_scale=2, ran_mask_num=ran_mask_num)
         render_num += 1
         if render_num > 50:
             break
