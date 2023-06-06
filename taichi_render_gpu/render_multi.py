@@ -90,17 +90,40 @@ class StaticRenderer:
             light = t3.Light(dir, color=[1.0, 1.0, 1.0])
             self.scene.add_light(light)
 
-def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path, res=(1024, 1024), enable_gpu=False, dis_scale=1, 
+def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path, num_angles, res=(1024, 1024), enable_gpu=False,  dis_scale=1, 
     ran_mask_num = 0):
-    img_path = os.path.join(texture_path, data_id + '.jpg')
-    obj_path = os.path.join(data_path, data_id, data_id + '.obj')
+    if enable_gpu:
+        ti.init(ti.gpu)
+        print("Enabled gpu")
+    # obj_path = os.path.join(data_path, data_id, 'NORMAL.obj')
+    # obj_path = os.path.join(data_path, data_id, data_id+'.obj') 
+
+                  
+    ###
+    obj_file_list = os.listdir(data_path)
+    obj_id = obj_file_list[data_id]
+    # obj_path = os.path.join(data_path, obj_id, obj_id+'.obj')
+    img_file_list = os.listdir(texture_path)
+    img_id = img_file_list[data_id]
+    obj_path = os.path.join(data_path, obj_id, obj_id + '.obj') 
+    img_path = os.path.join(texture_path, img_id, 'NORMAL_u1_v1.png')
+
+    ## for asset.example only:
+    # img_path = os.path.join(texture_path, 'skirt.jpg')
+    # obj_path = os.path.join(data_path, 'skirt', 'skirt.obj')
+
+    # obj_path = "F:/SS23/AT3DCV/at3dcv_project/output.obj"
+    # img_path = "F:/SS23/AT3DCV/at3dcv_project/texture.jpg"
     obj_names = os.listdir(data_path)
     
-    img_save_path = os.path.join(save_path, 'img', data_id)
-    depth_save_path = os.path.join(save_path, 'depth', data_id)
-    normal_save_path = os.path.join(save_path, 'normal', data_id)
-    mask_save_path = os.path.join(save_path, 'mask', data_id)
-    parameter_save_path = os.path.join(save_path, 'parameter', data_id)
+    ### changed data_id to obj_id ###
+    # obj_id=str(data_id)  ## for asset.example only
+    img_save_path = os.path.join(save_path, 'img', obj_id)
+    depth_save_path = os.path.join(save_path, 'depth', obj_id)
+    normal_save_path = os.path.join(save_path, 'normal', obj_id)
+    mask_save_path = os.path.join(save_path, 'mask', obj_id)
+    parameter_save_path = os.path.join(save_path, 'parameter', obj_id)
+    ### 
     if not os.path.exists(img_save_path):
         os.makedirs(img_save_path)
     if not os.path.exists(parameter_save_path):
@@ -144,7 +167,7 @@ def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path,
         mask_shapes.append(msk_obj['vi'].shape[0])
         mask_objs.append(msk_obj)
 
-    vi = obj['vi']
+    vi = obj['vi']                  ### (6,) pos + color
     median = np.median(vi, axis=0)  # + (np.random.randn(3) - 0.5) * 0.2
     vmin = vi.min(0)
     vmax = vi.max(0)
@@ -159,7 +182,7 @@ def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path,
         renderer.scene.models[i].modify_color(b_color)
 
     angle_mul = 1
-    for angle in tqdm(range(360), desc='angle'):
+    for angle in tqdm(range(0, 360, 360 // num_angles), desc='angle'):
         for i in range(ran_mask_num + 1):
             renderer.scene.models[i].type[None] = 0
         # if (os.path.exists(os.path.join(img_save_path, '{}.jpg'.format(angle)))):
@@ -175,7 +198,10 @@ def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path,
         cx = fx
         cy = fy
         target = median
-        pos = target + fwd
+        # pos = target + fwd
+        # target: 
+        pos = target[:3] + fwd
+        # pos = np.concatenate((target[:3] + fwd, target[3:]))[:6]          ## --> --save_path ../dataset/mh_single_test
         renderer.scene.cameras[0].set(pos=pos, target=target)
         renderer.scene.cameras[0].set_intrinsic(fx, fy, cx, cy)
         renderer.scene.cameras[0]._init()
@@ -234,6 +260,8 @@ if __name__ == '__main__':
     parser.add_argument("--texture_root", type=str)
     parser.add_argument("--save_path", type=str)
     parser.add_argument("--ran_mask_num", type=int, default=0)
+    parser.add_argument("--num_angles", type=int, default=4, help="Renders the image from num_angles views uniformly")
+    parser.add_argument("--enable_gpu", action="store_true")
     args = parser.parse_args()
     data_root = args.data_root
     texture_root = args.texture_root
@@ -242,8 +270,9 @@ if __name__ == '__main__':
     it = 0
     render_num = 0
     renderer = StaticRenderer()
-    for data_id in tqdm(os.listdir(data_root), desc='data_id'):
-        render_mv_random_mask(renderer, data_root, texture_root, data_id, save_path, res, False, dis_scale=2, ran_mask_num=ran_mask_num)
+    for data_id in tqdm(range(len(os.listdir(data_root))), desc='data_id'):
+    # for ind in tqdm(len(os.listdir(data_root))):
+        render_mv_random_mask(renderer, data_root, texture_root, data_id, save_path, args.num_angles, res, args.enable_gpu, dis_scale=2, ran_mask_num=ran_mask_num)
         render_num += 1
         if render_num > 50:
             break
