@@ -4,6 +4,7 @@ from PIL import Image
 import open3d as o3d
 import open3d.visualization.gui as gui
 import os
+import sys
 
 
 a = ["data/Synthetic/first_trial/Depth/r_0_0_depth_0000.png",
@@ -21,19 +22,20 @@ for i in range(4):
     K = intri
     intrinsics = o3d.camera.PinholeCameraIntrinsic(512, 512, K[0, 0], K[1, 1], K[0, 2], K[1, 2])
     extrinsics = np.concatenate((extri[f"cam_T_{i}"], [[0, 0, 0, 1]]), axis=0)
+    extrinsics[:, -1] = extrinsics[:, -1] * 1000 # Blender is in m, Open3D in mm 
 
     rgb = o3d.io.read_image(f"data/Synthetic/first_trial/r_0_{i}.png")
     d_tmp = Image.open(a[i])
-    d = o3d.geometry.Image(np.asarray(d_tmp)[:, :, 0].astype(np.uint8))
+    d = o3d.geometry.Image(np.asarray(d_tmp)[:, :, 0].astype(np.uint16)) # Scale depth?, change bit depth, currently 32 
 
-    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb, d, convert_rgb_to_intensity=False, depth_scale=1, depth_trunc=10000000)
+    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(rgb, d, convert_rgb_to_intensity=False, depth_scale=1, depth_trunc=10000000) #change bit depth, no need for trunc
 
     _pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsics)
     _pcd.transform(extrinsics)
     pcd += _pcd
 
 
-smpl = o3d.io.read_triangle_mesh("meetings/week_3/0.obj")
+smpl = o3d.io.read_triangle_mesh("meetings/week_3/0.obj") # correct scale?
 smpl.compute_vertex_normals()
 
 app = gui.Application.instance
