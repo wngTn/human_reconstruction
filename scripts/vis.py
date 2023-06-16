@@ -7,8 +7,113 @@ import pyrender
 import trimesh
 from PIL import Image
 import sys
+import json
 # sys.path.insert(0, "F:\\SS23\\AT3DCV\\at3dcv_project\\external\\EasyMocap-master\\easymocap")
 # from smplmodel.body_param import load_model
+
+sys.path.insert(0, "/Users/tonywang/Documents/University/Master/2nd_Semester/AT3DCV/project/external/EasyMocap-master/easymocap")
+from smplmodel.body_param import load_model
+import cv2
+
+# reads a json file
+def read_json(path):
+    assert os.path.exists(path), path
+    with open(path) as f:
+        data = json.load(f)
+    return data
+
+
+# reads a smpl file
+def read_smpl(filename):
+    datas = read_json(filename)
+    outputs = []
+    for data in datas:
+        for key in ["Rh", "Th", "poses", "shapes", "expression"]:
+            if key in data.keys():
+                data[key] = np.array(data[key], dtype=np.float32)
+        outputs.append(data)
+    return outputs
+
+
+# creates mesh out of vertices and faces
+def create_mesh(vertices, faces):
+    mesh = o3d.geometry.TriangleMesh()
+    mesh.vertices = o3d.utility.Vector3dVector(vertices)
+    mesh.triangles = o3d.utility.Vector3iVector(faces)
+    return mesh
+
+
+def load_joints(data_dir: str, frame_id):
+    """
+    Loads the body joints from the data_dir
+
+    :param data_dir: The path to the smpl files
+    :param frame_ids: The frame id
+    :return: Returns a list of the body_joints of the frame id
+    """
+    # loads the smpl model
+    body_model = load_model(gender="neutral", model_path="data/smpl_models")
+
+    data = read_smpl(os.path.join(data_dir, str(frame_id).zfill(6) + ".json"))
+    # all the meshes in a frame
+    frame_pcds = []
+    for i in range(len(data)):
+        frame = data[i]
+        Rh = frame["Rh"]
+        Th = frame["Th"]
+        poses = frame["poses"]
+        shapes = frame["shapes"]
+
+        # gets the vertices
+        vertices = body_model(
+            poses,
+            shapes,
+            Rh,
+            Th,
+            return_verts=False,
+            return_tensor=False,
+            return_smpl_joints=True,
+        )[0]
+
+        frame_pcds.append(vertices)
+
+    return frame_pcds
+
+
+def load_mesh(data_dir: str, frame_id):
+    """
+    Loads the meshes from the data_dir
+
+    :param data_dir: The path to the smpl files
+    :param frame_ids: The frame id
+    :return: Returns a list of the meshes of the frame id
+    """
+    # loads the smpl model
+    body_model = load_model(gender="neutral", model_path="external/EasyMocap-master/data/smplx")
+
+    data = read_smpl(os.path.join(data_dir, str(frame_id).zfill(6) + ".json"))
+    # all the meshes in a frame
+    frame_meshes = []
+    frame_ids = []
+    for i in range(len(data)):
+        frame = data[i]
+        Rh = frame["Rh"]
+        # Rh = np.array([1, -1, -1])
+        Th = frame["Th"]
+        poses = frame["poses"]
+        shapes = frame["shapes"]
+
+        # gets the vertices
+        vertices = body_model(poses, shapes, Rh, Th, return_verts=True, return_tensor=False)[0]
+
+        # the mesh
+
+        model = create_mesh(vertices=vertices, faces=body_model.faces)
+
+        frame_meshes.append(model)
+        frame_ids.append(frame["id"])
+
+    return frame_meshes, frame_ids
 
 class FileStorage:
     def __init__(self, filename, isWrite=False):
@@ -90,16 +195,18 @@ def render(meshes, cv2_image, R, T, K, output_img_path):
     camera_pose[1, 1] *= -1.0
 
     scene = pyrender.Scene(bg_color=[0.0, 0.0, 0.0, 0.0], ambient_light=(1., 1., 1.))
+    
     camera = pyrender.camera.IntrinsicsCamera(fx=K[0, 0], fy=K[1, 1], cx=K[0, 2], cy=K[1, 2])
     scene.add(camera, pose=camera_pose)
 
-    for mesh in meshes:
-        vertices = np.asarray(mesh.vertices)
-        faces = np.asarray(mesh.triangles)
-        out_mesh = trimesh.Trimesh(vertices, faces, validate=False, process=False)
-        human_mat = pyrender.MetallicRoughnessMaterial(baseColorFactor=[0.3, 0.3, 0.3 ,0.5])
-        mesh = pyrender.Mesh.from_trimesh(out_mesh, material=human_mat, smooth=True, wireframe=False)
-        scene.add(mesh, 'mesh', pose=pred_pose)
+    mesh = meshes
+    vertices = np.asarray(mesh.vertices)
+    faces = np.asarray(mesh.triangles)
+    out_mesh = trimesh.Trimesh(vertices, faces, validate=False, process=False)
+    # out_mesh.show()
+    human_mat = pyrender.MetallicRoughnessMaterial(baseColorFactor=[0.3, 0.3, 0.3 ,0.5])
+    mesh = pyrender.Mesh.from_trimesh(out_mesh, material=human_mat, smooth=True, wireframe=False)
+    scene.add(mesh, 'mesh', pose=pred_pose)
 
     r = pyrender.OffscreenRenderer(viewport_width=W, viewport_height=H, point_size=1.0)
     color, _ = r.render(scene, flags=pyrender.RenderFlags.RGBA)
@@ -117,16 +224,17 @@ def main(root_dir, intri_file_path, extri_file_path):
 
     output_dir = os.path.join(root_dir, 'rendered_visualization')
     image_dirs = [os.path.join(root_dir, 'images', str(i)) for i in range(4)]
-    smpl_dir = os.path.join(root_dir, 'smpl')
+    smpl_dir = os.path.join(root_dir, 'Obj')
 
     for idx, image_dir in enumerate(image_dirs):
         cam_output_dir = os.path.join(output_dir, f"camera_{idx}")
+        os.makedirs(cam_output_dir, exist_ok=True)
 
         for frame_num in os.listdir(image_dir):
             img_path = os.path.join(image_dir, f"{frame_num.zfill(6)}")
             cv2_image = cv2.imread(img_path)
-
-            smpl_path = os.path.join(smpl_dir, f"{int(frame_num[:-4])}.obj")
+            import ipdb; ipdb.set_trace()
+            smpl_path = os.path.join(smpl_dir, f"smplx_{int(frame_num[:-4])}.obj")
             smpl_mesh = o3d.io.read_triangle_mesh(smpl_path)
 
             K = intrinsics[str(idx)]['K']
