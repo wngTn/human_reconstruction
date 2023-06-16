@@ -185,6 +185,27 @@ Example:
  ./scripts/cloudsend.sh -p 'fcanys2333' '<data>' 'https://nextcloud.in.tum.de/index.php/s/RjdwM59XHAkWkMC'
 ```
 
+# Running DeepMultiCap on Synthetic Data
+
+1. Make sure to include the synthetic dataset under data. There should be `depth`, `img`, `mask`, `normal`, `parameter`, `smplx` under the `data/Synthetic/first_trial` folder. Copy the smplx folder and generate missing files by yourself if needed.
+Make sure to have pretrained checkpoints of DeepMultiCap downloaded in checkpoints/demo/.
+
+1. Generate smpl global maps
+```
+cd taichi_render_gpu
+python render_smpl.py --dataroot ../data/Synthetic/first_trial --obj_path ../data/Synthetic/first_trial/smplx --faces_path ../lib/data/smplx_multi.obj --synthetic --flip_y
+```
+
+- This should now generate a folder called `smpl_pos` under data/Synthetic/first_trial
+
+3. Generate reconstructions and visualization
+```
+# go back to project root folder
+ python apps/eval_3d.py --config configs/synthetic_first_trial_gt.yaml --dataroot data/Synthetic/first_trial  
+```
+
+- Now the reconstructions should be in `results/synthetic_first_trial_gt`
+
 # Installing EasyMocap #
 Download SMPL models:
 ```
