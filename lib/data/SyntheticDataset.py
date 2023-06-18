@@ -28,12 +28,12 @@ log = logging.getLogger('trimesh')
 log.setLevel(40)
 
 
-class Synthetic(Dataset):
+class SyntheticDataset(Dataset):
     @staticmethod
     def modify_commandline_options(parser, is_train):
         return parser
 
-    def __init__(self, opt, phase='train', num_views=None):
+    def __init__(self, opt, cache_data, cache_data_lock, phase='train', num_views=None):
         self.opt = opt
         self.projection_mode = 'percpective'
         self.phase = phase
@@ -47,10 +47,11 @@ class Synthetic(Dataset):
         self.SMPL_NORMAL = os.path.join(self.root, 'smpl_pos')
         self.MASK = os.path.join(self.root, 'Segmentation')
 
-        if opt.obj_path is not None:
-            self.OBJ = opt.obj_path
-        if opt.smpl_path is not None:
-            self.SMPL = opt.smpl_path
+        # if opt.obj_path is not None:
+        #    self.OBJ = opt.obj_path
+        # if opt.smpl_path is not None:
+        #    self.SMPL = opt.smpl_path
+        self.SMPL = self.OBJ
 
         self.smpl_faces = readobj(opt.smpl_faces)['f']
 
@@ -65,6 +66,8 @@ class Synthetic(Dataset):
         self.num_sample_inout = self.opt.num_sample_inout
 
         self.subjects = self.get_subjects()
+        self.cache_data = cache_data
+        self.cache_data_lock = cache_data_lock
 
         # PIL to tensor
         self.to_tensor = transforms.Compose([
@@ -79,11 +82,14 @@ class Synthetic(Dataset):
                                    hue=opt.aug_hue)
         ])
 
+    def clear_cache(self):
+        self.cache_data.clear()
+
     def get_subjects(self):
         return ["main_subject"]
 
     def __len__(self):
-        return len(self.subjects) * len(self.yaw_list)
+        return 523
 
     def visibility_sample(self, data, depth, calib, mask=None):
         surface_points = data['surface_points']
@@ -200,14 +206,14 @@ class Synthetic(Dataset):
             'feat_points': data['feat_points']
         }
 
-    def select_sampling_method(self, subject, b_min, b_max):
-        if self.cache_data.__contains__(subject):
-            return self.cache_data[subject]
-        print(subject, self.cache_data.__len__())
+    def select_sampling_method(self, index, b_min, b_max):
+        if self.cache_data.__contains__(index):
+            return self.cache_data[index]
+        print(index, self.cache_data.__len__())
         root_dir = self.OBJ
-        sub_name = subject
+        sub_name = index
         if self.phase != 'inference':
-            mesh = trimesh.load(os.path.join(root_dir, sub_name, '%s.obj' % sub_name))
+            mesh = trimesh.load(os.path.join(root_dir, f'smplx_{str(index).zfill(6)}.obj'))
             if self.opt.coarse_part:
                 radius_list = [self.opt.sigma, self.opt.sigma * 2, self.opt.sigma * 4]
             else:
@@ -236,7 +242,7 @@ class Synthetic(Dataset):
         feat_points = torch.zeros(1)
 
         self.cache_data_lock.acquire()
-        self.cache_data[subject] = {
+        self.cache_data[index] = {
             'sample_points': sample_points,
             'surface_points': surface_points,
             'inside': inside,
@@ -244,7 +250,7 @@ class Synthetic(Dataset):
         }
         self.cache_data_lock.release()
 
-        return self.cache_data[subject]
+        return self.cache_data[index]
 
     def get_norm(self, frame_id):
         b_min = torch.zeros(3).float()
@@ -314,12 +320,14 @@ class Synthetic(Dataset):
             mask_path = os.path.join(self.MASK, f"r_{frame_id}_{cam_id}_segmentation_{str(frame_id).zfill(4)}.png")
 
             intrinsic, extrinsic, _ = self.load_cam_parameters(all_cam_parameters, cam_id)
+            extrinsic = extrinsic[:3, :]
 
             mask = Image.open(mask_path).convert('RGB')
             render = Image.open(render_path).convert('RGB')
             normal = Image.open(normal_path)
             depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
             depth = depth[:, :, 0].astype(np.float32) / 1000.0
+            depth = Image.fromarray(depth)
             smpl_norm = Image.open(smpl_norm_path)
 
             imgs_list = [render, depth, normal, mask, smpl_norm]
@@ -478,7 +486,7 @@ class Synthetic(Dataset):
         subject = self.subjects[subject_id]
         res = {
             'name': subject,
-            'mesh_path': os.path.join(self.OBJ, f'smpl_x{str(index).zfill(6)}.obj'),
+            'mesh_path': os.path.join(self.OBJ, f'smplx_{str(index).zfill(6)}.obj'),
             'sid': subject_id,
         }
 
@@ -488,12 +496,12 @@ class Synthetic(Dataset):
         norm_parameter = self.get_norm(index)
         res.update(norm_parameter)
 
-        sample_data = self.select_sampling_method(subject, res['b_min'].numpy(), res['b_max'].numpy())
+        sample_data = self.select_sampling_method(index, res['b_min'].numpy(), res['b_max'].numpy())
         if self.phase != 'inference':
             sample_data = self.visibility_sample(sample_data, res['depth'], res['calib'], res['mask'])
         res.update(sample_data)
 
-        mesh = trimesh.load(os.path.join(self.SMPL, subject, 'smplx.obj'))
+        mesh = trimesh.load(os.path.join(self.SMPL, f'smplx_{str(index).zfill(6)}.obj'))
         res['extrinsic'][0, :, :] = 0
         for i in range(3):
             res['extrinsic'][0, i, i] = 1
@@ -575,6 +583,6 @@ class Synthetic(Dataset):
 # get options
 opt = parse_config()
 if __name__=='__main__':
-    data = Synthetic(opt, phase='train', num_views=4)
+    data = SyntheticDataset(opt, phase='train', num_views=4)
     print(data[0]['name'])
 

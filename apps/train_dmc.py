@@ -23,11 +23,14 @@ from lib.options import parse_config
 from lib.mesh_util import *
 from lib.sample_util import *
 from lib.train_util import *
-from lib.data import *
+from lib.data import SyntheticDataset
 from lib.model import *
 
 # get options
 opt = parse_config()
+
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+print("Using device: %s" % device)
 
 def train(opt):
     np.random.seed(int(time.time()))
@@ -36,13 +39,9 @@ def train(opt):
     # set cuda
     log = SummaryWriter(opt.log_path)
     total_iteration = 0
-    cuda = torch.device('cuda:%s' % opt.gpu_ids[0])
-    netG = DMCNet(opt, projection_mode='perspective').to(cuda)
-    netN = NormalNet().to(cuda)
+    netG = DMCNet(opt, projection_mode='perspective').to(device)
+    netN = NormalNet().to(device)
     print('Using Network: ', netG.name, netN.name)
-    gpu_ids = [int(i) for i in opt.gpu_ids.split(',')]
-    netG = DataParallel(netG, device_ids=gpu_ids)
-    netN = DataParallel(netN, device_ids=gpu_ids)
 
     optimizerG = torch.optim.Adam(netG.parameters(), lr=opt.learning_rate)
     lr = opt.learning_rate
@@ -52,19 +51,16 @@ def train(opt):
 
     if opt.load_netG_checkpoint_path is not None:
         print('loading for net G ...', opt.load_netG_checkpoint_path)
-        netG.load_state_dict(torch.load(opt.load_netG_checkpoint_path, map_location=cuda), strict=False)
+        netG.load_state_dict(torch.load(opt.load_netG_checkpoint_path, map_location=device), strict=False)
     
     if opt.load_netN_checkpoint_path is not None:
         print('loading for net N ...', opt.load_netN_checkpoint_path)
-        netN.load_state_dict(torch.load(opt.load_netN_checkpoint_path, map_location=cuda), strict=False)
+        netN.load_state_dict(torch.load(opt.load_netN_checkpoint_path, map_location=device), strict=False)
     
     print("loaded finished!")
     
-    yaw_list = sorted(np.random.choice(range(360), 30))
-    print(yaw_list)
-
-    train_dataset = DMCDataset(opt, cache_data=Manager().dict(), cache_data_lock=Lock(), phase='train', yaw_list=yaw_list)
-    test_dataset = DMCDataset(opt, cache_data=Manager().dict(), cache_data_lock=Lock(), phase='test', yaw_list=yaw_list)
+    train_dataset = SyntheticDataset(opt,  cache_data=Manager().dict(), cache_data_lock=Lock(), phase='train', num_views=4)
+    test_dataset = SyntheticDataset(opt,  cache_data=Manager().dict(), cache_data_lock=Lock(), phase='test', num_views=4)
         
     projection_mode = train_dataset.projection_mode
     print('projection_mode:', projection_mode)
@@ -107,7 +103,7 @@ def train(opt):
             # retrieve the data
             for key in train_data:
                 if torch.is_tensor(train_data[key]):
-                    train_data[key] = train_data[key].to(device=cuda)
+                    train_data[key] = train_data[key].to(device=device)
 
             # predict normal
             with torch.no_grad():
@@ -117,8 +113,6 @@ def train(opt):
             train_data['normal'] = net_normal.detach()
             res, error = netG.forward(train_data)
             optimizerG.zero_grad()
-            if len(gpu_ids) > 1:
-                error = error.sum()
             error.backward()
             optimizerG.step()
 
@@ -126,10 +120,10 @@ def train(opt):
             eta = ((iter_net_time - epoch_start_time) / (train_idx + 1)) * len(train_data_loader) - (
                     iter_net_time - epoch_start_time)
 
-            log.add_scalar('loss', error.item() / len(gpu_ids), total_iteration)
+            log.add_scalar('loss', error.item(), total_iteration)
             if train_idx % opt.freq_plot == 0:
                 descrip = 'Name: {0} | Epoch: {1} | {2}/{3} | Err: {4:.06f} | LR: {5:.06f} | Sigma: {6:.02f} | dataT: {7:.05f} | netT: {8:.05f} | ETA: {9:02d}:{10:02d}'.format(
-                    opt.name, epoch, train_idx, len(train_data_loader), error.item() / len(gpu_ids), lr, opt.sigma,
+                    opt.name, epoch, train_idx, len(train_data_loader), error.item(), lr, opt.sigma,
                     iter_start_time - iter_data_time,
                     iter_net_time - iter_start_time, int(eta // 60),
                     int(eta - 60 * (eta // 60)))
@@ -152,9 +146,7 @@ def train(opt):
         # update learning rate
         lr = adjust_learning_rate(optimizerG, epoch, lr, opt.schedule, opt.gamma)
         train_dataset.clear_cache()
-        
-        yaw_list = sorted(np.random.choice(range(360), 30))
-        train_dataset.yaw_list = yaw_list
+
     log.close()
 
 
