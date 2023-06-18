@@ -41,8 +41,8 @@ def train(opt):
     netN = NormalNet().to(cuda)
     print('Using Network: ', netG.name, netN.name)
     gpu_ids = [int(i) for i in opt.gpu_ids.split(',')]
-    netG = DataParallel(netG, device_ids=gpu_ids)
-    netN = DataParallel(netN, device_ids=gpu_ids)
+    # netG = DataParallel(netG, device_ids=gpu_ids)
+    # netN = DataParallel(netN, device_ids=gpu_ids)
 
     optimizerG = torch.optim.Adam(netG.parameters(), lr=opt.learning_rate)
     lr = opt.learning_rate

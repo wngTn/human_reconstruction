@@ -310,7 +310,8 @@ class DMCDataset(Dataset):
             mask[mask > 1] = 1.0
             ero_mask = torch.FloatTensor(np.array(mask).reshape((512, 512, -1)))[:, :, 0] / 255
             render = self.to_tensor(render) * mask.reshape(1, 512, 512)
-            normal = self.to_tensor(normal) * mask.reshape(1, 512, 512)
+            # normal = self.to_tensor(normal) * mask.reshape(1, 512, 512)
+            normal = self.to_tensor(normal.convert('RGB')) * mask.reshape(1, 512, 512)
             smpl_norm = self.to_tensor(smpl_norm)
 
             mask = torch.sum(torch.FloatTensor((np.array(mask_new).reshape((512, 512, -1)))), dim=2) / 255
@@ -542,7 +543,7 @@ class DMCDataset(Dataset):
         subject = self.subjects[sid]
         res = {
             'name': subject,
-            'mesh_path': os.path.join(self.OBJ, subject, subject + '.obj'),         ## --> ? never used
+            'mesh_path': os.path.join(self.OBJ, subject, subject + '.obj'),
             'sid': sid,
             'yid': yid,
         }
@@ -571,7 +572,7 @@ class DMCDataset(Dataset):
         translation[3, 3] = 1
         mesh.apply_transform(translation)
         if self.opt.infer:
-            print('after: ', mesh.bounds)
+            print('Mesh bounds after transformation:', mesh.bounds)
 
         # center
         transform = np.zeros((4, 4))

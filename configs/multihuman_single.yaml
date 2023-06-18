@@ -22,8 +22,6 @@ load_netN_checkpoint_path: checkpoints/demo/netN_latest
 
 # smpl
 smpl_faces: lib/data/smplx_multi.obj
-# smplx_correction.obj
-# smplx_fine.obj      ### -> error: indexes dont match
 
 # marching cube
 resolution: 512

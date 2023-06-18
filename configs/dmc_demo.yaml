@@ -7,9 +7,8 @@ infer: True
 infer_reverse: True
 
 # data 
-num_views: 6
-yaw_list: [0, 60, 120, 180, 240, 300]
-# [0, 90, 180, 270]
+num_views: 4
+yaw_list: [0, 90, 180, 270]
 flip_x: False
 
 # network

@@ -183,6 +183,7 @@ def render_mv_random_mask(renderer, data_path, texture_path, data_id, save_path,
 
     angle_mul = 1
     for angle in tqdm(range(0, 360, 360 // num_angles), desc='angle'):
+    # for angle in tqdm(range(360), desc='angle'):
         for i in range(ran_mask_num + 1):
             renderer.scene.models[i].type[None] = 0
         # if (os.path.exists(os.path.join(img_save_path, '{}.jpg'.format(angle)))):

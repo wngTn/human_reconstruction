@@ -27,35 +27,51 @@ def read_norm_smpl(path, smpl_faces, synthetic, flip_normal=False, init_rot=None
     obj['vn'] = vn
 
     # For synthetic data: first perform axis transform for smpl model
+    print(synthetic)
     if synthetic:
-        rotation_matrix = np.array([[1, 0, 0],
-                                    [0, 0, -1],
-                                    [0, 1, 0]])
+        d = 90
+        rotation_matrix = np.array([
+            [1, 0, 0],
+            [0, np.cos(np.deg2rad(d)), -np.sin(np.deg2rad(d))],
+            [0, np.sin(np.deg2rad(d)), np.cos(np.deg2rad(d))]
+        ])
         rotated_vertices = np.dot(obj['vi'], rotation_matrix.T)
         rotated_normals = np.dot(obj['vn'], rotation_matrix.T)
         obj['vi'] = rotated_vertices
         obj['vn'] = rotated_normals 
     
     return obj
-            
+
+def load_parameters(prefix_path):
+    parameters = np.load(os.path.join(prefix_path, "output_data.npz"), allow_pickle=True)
+    return parameters
+
+def load_cam_parameters(parameters, cam_num):
+    intrinsics = np.array(parameters["scene_camera"].item()[f"cam_T_{cam_num}"]["cam_K"]).reshape(3, 3)
+    world_to_cam_R = np.array(parameters["scene_camera"].item()[f"cam_T_{cam_num}"]["cam_R_w2c"]).reshape(3, 3)
+    world_to_cam_T = np.array(parameters["scene_camera"].item()[f"cam_T_{cam_num}"]["cam_t_w2c"]).reshape(3, 1)
+    world_to_cam_matrix = np.concatenate([world_to_cam_R, world_to_cam_T], axis=1)
+    # reshaping to 4z4
+    world_to_cam_matrix = np.concatenate([world_to_cam_matrix, np.array([[0, 0, 0, 1]])], axis=0)
+
+    camera_to_world_matrix = np.array(parameters["camera_world"].item()[f"cam_T_{cam_num}"]).reshape(4, 4)
+
+    return intrinsics, world_to_cam_matrix, camera_to_world_matrix
+        
 
 def render_smpl_global_normal(dataroot, obj_path, faces_path, res=(1024, 1024), angles=range(360), flip_y=False, flip_normal=False,  synthetic=False, init_rot=None):
     ti.init(ti.cpu)
     pos_save_root = os.path.join(dataroot, 'smpl_pos')
     os.makedirs(pos_save_root, exist_ok=True)
-    parameter_path = os.path.join(dataroot, 'parameter')
-    obj_list = os.listdir(obj_path)
-    obj = read_norm_smpl(os.path.join(obj_path, obj_list[0], 'smplx.obj'), faces_path, synthetic, flip_normal, init_rot)
-
-    # rotate over x-axis by d degrees
-    # d = 90
-    # R_obj = np.array([
-    #     [1, 0, 0],
-    #     [0, np.cos(np.deg2rad(d)), -np.sin(np.deg2rad(d))],
-    #     [0, np.sin(np.deg2rad(d)), np.cos(np.deg2rad(d))]
-    # ])
-    # obj['vi'] = np.matmul(R_obj, np.array(obj['vi'].T)).T
-    
+    parameter_path = os.path.join(dataroot)
+    all_cam_parameters = load_parameters(parameter_path)
+    # obj_list = os.listdir(obj_path)
+    # obj = read_norm_smpl(os.path.join(obj_path, obj_list[0], 'smplx.obj'), faces_path, synthetic, flip_normal, init_rot)
+    # import ipdb; ipdb.set_trace()
+    if synthetic:
+        obj_list = list(filter(lambda x : x.endswith(".obj"), os.listdir(obj_path)))
+        obj = read_norm_smpl(os.path.join(obj_path, obj_list[0]), faces_path, synthetic, flip_normal, init_rot)
+    import ipdb; ipdb.set_trace()
     model = t3.Model(obj=obj, col_n=obj['vi'].shape[0])
     
     scene = t3.Scene()
@@ -72,22 +88,16 @@ def render_smpl_global_normal(dataroot, obj_path, faces_path, res=(1024, 1024), 
     camera = t3.Camera(res=res)
     scene.add_camera(camera)
     scene.init()
-    for obj_name in tqdm(os.listdir(parameter_path)):
-        pos_save_path = os.path.join(pos_save_root, obj_name)
+    for j, obj_name in tqdm(enumerate(obj_list)):
         # if os.path.exists(pos_save_path) and len(os.listdir(os.path.join(pos_save_path))) == len(angles):
         #    continue
-        if not os.path.exists(os.path.join(obj_path, obj_name, 'smplx.obj')):
-            continue
-        obj = read_norm_smpl(os.path.join(obj_path, obj_name, 'smplx.obj'), faces_path, synthetic, flip_normal, init_rot)
-        os.makedirs(pos_save_path, exist_ok=True)
-        for angle in angles:
+        obj = read_norm_smpl(os.path.join(obj_path, obj_name), faces_path, synthetic, flip_normal, init_rot)
+        for cam_id in range(4):
+            pos_save_path = os.path.join(pos_save_root, f"r_{j}_{cam_id}_global_smpl.jpg")
             import ipdb; ipdb.set_trace()
-            intrinsic = np.load(os.path.join(parameter_path, obj_name, '{}_intrinsic.npy'.format(angle)))
-            extrinsic = np.load(os.path.join(parameter_path, obj_name, '{}_extrinsic.npy'.format(angle)))
-        # for i in range(len(angles)):
-            # intrinsic = np.load(os.path.join(parameter_path, obj_name, '{}_intrinsic.npy'.format(i)))
-            # extrinsic = np.load(os.path.join(parameter_path, obj_name, '{}_extrinsic.npy'.format(i)))
-            
+            intrinsic, extrinsic, _ = load_cam_parameters(all_cam_parameters, cam_id)
+            extrinsic = extrinsic[:3, :]
+
             if flip_y:
                 camera.set_intrinsic(fx=intrinsic[0, 0], fy=-intrinsic[1, 1], cx=intrinsic[0, 2], cy=res[0]-intrinsic[1, 2])
             else:    
@@ -104,8 +114,8 @@ def render_smpl_global_normal(dataroot, obj_path, faces_path, res=(1024, 1024), 
             camera._init()
             scene.render()
             
-            ti.imwrite( (camera.img.to_numpy() + 1)/2, save_path:=os.path.join(pos_save_path, '{}.jpg'.format(angle)))
-            print("exported %s" % save_path)
+            ti.imwrite( (camera.img.to_numpy() + 1)/2, pos_save_path)
+            print("exported %s" % pos_save_path)
             # ti.imwrite( (camera.img.to_numpy() + 1)/2, os.path.join(pos_save_path, '{}.jpg'.format(i)))
 
 

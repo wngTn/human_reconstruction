@@ -8,6 +8,7 @@ import argparse
 def depth_to_npz(folder_path, target_path):
     """
     Convert depth images to numpy arrays and reorganize in a target folder
+    ### target_path should be like: INPUT_DATASET_FOLDER/depth
     """
     os.makedirs(target_path, exist_ok=True)
 
@@ -19,13 +20,15 @@ def depth_to_npz(folder_path, target_path):
             save_dir = split_name[1]
             save_name = split_name[2]
             os.makedirs(os.path.join(target_path, save_dir), exist_ok=True)
-            np.savez(os.path.join(target_path, save_dir, f'{save_name}.npz'), depth_map_array=depth_map_array)
+            data = {'arr_0': depth_map_array}
+            np.savez(os.path.join(target_path, save_dir, f'{save_name}.npz'), data)
     print('Depth folder transformed and reorganized.')
 
 
 def img_reorganize(folder_path, target_path):
     """
     Reorganize image files in a target folder
+    ### target_path should be like: INPUT_DATASET_FOLDER/img
     """
     os.makedirs(target_path, exist_ok=True)
 
@@ -36,7 +39,7 @@ def img_reorganize(folder_path, target_path):
             save_name = split_name[2]
             os.makedirs(os.path.join(target_path, save_dir), exist_ok=True)
             old_file_path = os.path.join(folder_path, file_name)
-            new_file_path = os.path.join(target_path, save_dir, f'{save_name}.png')
+            new_file_path = os.path.join(target_path, save_dir, save_name)
             shutil.copy2(old_file_path, new_file_path)
     print('Img files reorganized.')
 
@@ -44,6 +47,7 @@ def img_reorganize(folder_path, target_path):
 def normal_reorganize(folder_path, target_path):
     """
     Reorganize normal files in a target folder
+    ### target_path should be like: INPUT_DATASET_FOLDER/normal
     """
     os.makedirs(target_path, exist_ok=True)
 
@@ -62,6 +66,8 @@ def normal_reorganize(folder_path, target_path):
 def mask_reorganize(folder_path, target_path):
     """
     Reorganize mask files in a target folder
+    ### folder_path usually in: external/Self-Correction-Human-Parsing/mhp_extension/data/DATASET_FOLDER/mhp_fusion_parsing/global_tag
+    ### target_path should be like: INPUT_DATASET_FOLDER/mask
     """
     os.makedirs(target_path, exist_ok=True)
 
@@ -74,9 +80,15 @@ def mask_reorganize(folder_path, target_path):
             old_file_path = os.path.join(folder_path, file_name)
             new_file_path = os.path.join(target_path, save_dir, f'{save_name}')
             shutil.copy2(old_file_path, new_file_path)
+
     print('Mask files reorganized.')
 
 def copy_image(source_folder, destination_folder):
+    """
+    Copy images for mask generation
+    ### target_path should be like: external/Self-Correction-Human-Parsing/mhp_extension/data/DATASET_FOLDER/global_pic
+    """
+
     # Ensures that the destination directory exists, if it doesn't, creates it.
     os.makedirs(destination_folder, exist_ok=True)
 
@@ -107,6 +119,33 @@ def copy_image(source_folder, destination_folder):
 
     print(f"Copied {count} files from {source_folder} to {destination_folder}.")
 
+def parameter_reorganize(folder_path, target_path, num_imgs, num_views):
+    """
+    Reorganize parameter files in corresponding target folders
+    ### target_path should be like: INPUT_DATASET_FOLDER/parameter
+    """
+    os.makedirs(target_path, exist_ok=True)
+
+    import json
+    cam_info_file = os.path.join(folder_path, 'camera_info.json')
+    with open(cam_info_file, 'r') as json_file:
+        cam_info = json.load(json_file)
+
+    for img in tqdm(range(num_imgs)):
+        output_path = os.path.join(target_path, str(img)) 
+        os.makedirs(output_path, exist_ok=True)
+
+        for id in range(num_views):
+            # extri
+            extrinsic_matrix = np.array(cam_info['cam_mat_extr']['cam_T_' + str(id)])
+            np.save(os.path.join(output_path, f'{id}_extrinsic.npy'), extrinsic_matrix)
+            # intri
+            intrinsic_matrix = np.array([[cam_info['cam_mat_intr']['f_x'], 0, cam_info['cam_mat_intr']['c_x']],
+            [0, cam_info['cam_mat_intr']['f_y'], cam_info['cam_mat_intr']['c_y']],
+            [0, 0, 1]])
+            np.save(os.path.join(output_path, f'{id}_intrinsic.npy'), intrinsic_matrix)
+        
+    print('Parameters reorganized.')
 
 def main(args):
     if args.depth_folder and args.depth_target:
@@ -119,6 +158,8 @@ def main(args):
         mask_reorganize(args.mask_folder, args.mask_target)
     if args.source_image and args.destination_image:
         copy_image(args.source_image, args.destination_image)
+    if args.parameter_folder and args.parameter_target and args.parameter_num_imgs and args.parameter_num_views:
+        parameter_reorganize(args.parameter_folder, args.parameter_target, args.parameter_num_imgs, args.parameter_num_views)
 
 
 if __name__ == '__main__':
@@ -133,7 +174,10 @@ if __name__ == '__main__':
     parser.add_argument('--mask_target', type=str, default=None, help='Target folder for mask files')
     parser.add_argument("-src_img", "--source_image", help="Source directory", default=None)
     parser.add_argument("-dst_img", "--destination_image", help="Destination directory", default=None)
+    parser.add_argument('--parameter_folder', type=str, default=None, help='Source folder for camera info json file')
+    parser.add_argument('--parameter_target', type=str, default=None, help='Target folder for camera extrinsic and intrinsic')
+    parser.add_argument('--parameter_num_imgs', type=int, default=33, help='Number of images in total')
+    parser.add_argument('--parameter_num_views', type=int, default=4, help='Number of views for each frame')
     args = parser.parse_args()
     main(args)
-
 
