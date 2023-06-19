@@ -89,7 +89,7 @@ class SyntheticDataset(Dataset):
         return ["main_subject"]
 
     def __len__(self):
-        return 523
+        return 233
 
     def visibility_sample(self, data, depth, calib, mask=None):
         surface_points = data['surface_points']
@@ -209,9 +209,8 @@ class SyntheticDataset(Dataset):
     def select_sampling_method(self, index, b_min, b_max):
         if self.cache_data.__contains__(index):
             return self.cache_data[index]
-        print(index, self.cache_data.__len__())
+        # print(index, self.cache_data.__len__())
         root_dir = self.OBJ
-        sub_name = index
         if self.phase != 'inference':
             mesh = trimesh.load(os.path.join(root_dir, f'smplx_{str(index).zfill(6)}.obj'))
             if self.opt.coarse_part:
@@ -289,11 +288,19 @@ class SyntheticDataset(Dataset):
     def load_cam_parameters(self, parameters, cam_num):
         intrinsics = np.array(parameters["scene_camera"].item()[f"cam_T_{cam_num}"]["cam_K"]).reshape(3, 3)
         world_to_cam_R = np.array(parameters["scene_camera"].item()[f"cam_T_{cam_num}"]["cam_R_w2c"]).reshape(3, 3)
+        d = 90
+        rotation_matrix = np.array([
+            [1, 0, 0, 0],
+            [0, np.cos(np.deg2rad(d)), -np.sin(np.deg2rad(d)), 0],
+            [0, np.sin(np.deg2rad(d)), np.cos(np.deg2rad(d)), 0],
+            [0, 0, 0, 1]
+        ], dtype=np.float32)
         world_to_cam_T = np.array(parameters["scene_camera"].item()[f"cam_T_{cam_num}"]["cam_t_w2c"]).reshape(3, 1)
         world_to_cam_matrix = np.concatenate([world_to_cam_R, world_to_cam_T], axis=1)
         # reshaping to 4z4
         world_to_cam_matrix = np.concatenate([world_to_cam_matrix, np.array([[0, 0, 0, 1]])], axis=0)
         world_to_cam_matrix[:3, 3] = world_to_cam_matrix[:3, 3] / 1000
+        world_to_cam_matrix = world_to_cam_matrix @ rotation_matrix
 
         camera_to_world_matrix = np.array(parameters["camera_world"].item()[f"cam_T_{cam_num}"]).reshape(4, 4)
 
@@ -358,9 +365,9 @@ class SyntheticDataset(Dataset):
                     cy = scale * (cy - y_min)
                     intrinsic[0, 0], intrinsic[1, 1], intrinsic[0, 2], intrinsic[1, 2] = fx, fy, cx, cy
                     depth = transforms.RandomVerticalFlip(p=1.0)(depth)
-            else:
-                intrinsic[1, :] *= -1.0
-                intrinsic[1, 2] += self.load_size
+            # else:
+                # intrinsic[1, :] *= -1.0
+                # intrinsic[1, 2] += self.load_size
 
             if self.is_train:
                 # Pad images
@@ -563,9 +570,9 @@ class SyntheticDataset(Dataset):
                 (np.transpose(render_data['image'][0][0:3, :, :].numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0)
             img = np.array(img, dtype=np.uint8).copy()
             calib = render_data['calib'][0]
-            # pts = torch.FloatTensor(res['samples'][:, res['labels'][0] > 0.5]) # [3, N]
+            pts = torch.FloatTensor(res['samples'][:, res['labels'][0] > 0.5]) # [3, N]
             # pts = res['samples']
-            pts = torch.FloatTensor(res['feat_points'])
+            # pts = torch.FloatTensor(res['feat_points'])
             print(pts)
             pts = perspective(pts.unsqueeze(0), calib.unsqueeze(0)).squeeze(0).transpose(0, 1)
             for p in pts:
@@ -576,6 +583,8 @@ class SyntheticDataset(Dataset):
         return res
 
     def __getitem__(self, index):
+        if index == 0:
+            index = 233
         return self.get_item(index)
 
 
