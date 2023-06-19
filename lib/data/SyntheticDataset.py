@@ -89,7 +89,7 @@ class SyntheticDataset(Dataset):
         return ["main_subject"]
 
     def __len__(self):
-        return 233
+        return 23
 
     def visibility_sample(self, data, depth, calib, mask=None):
         surface_points = data['surface_points']
@@ -584,7 +584,7 @@ class SyntheticDataset(Dataset):
 
     def __getitem__(self, index):
         if index == 0:
-            index = 233
+            index = 23
         return self.get_item(index)
 
 
