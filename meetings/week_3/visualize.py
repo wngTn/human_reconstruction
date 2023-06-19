@@ -15,10 +15,19 @@ def load_parameters(prefix_path):
 def load_cam_parameters(parameters, cam_num):
     intrinsics = np.array(parameters["scene_camera"].item()[f"cam_T_{cam_num}"]["cam_K"]).reshape(3, 3)
     world_to_cam_R = np.array(parameters["scene_camera"].item()[f"cam_T_{cam_num}"]["cam_R_w2c"]).reshape(3, 3)
+    d = 90
+    rotation_matrix = np.array([
+        [1, 0, 0, 0],
+        [0, np.cos(np.deg2rad(d)), -np.sin(np.deg2rad(d)), 0],
+        [0, np.sin(np.deg2rad(d)), np.cos(np.deg2rad(d)), 0],
+        [0, 0, 0, 1]
+    ], dtype=np.float32)
     world_to_cam_T = np.array(parameters["scene_camera"].item()[f"cam_T_{cam_num}"]["cam_t_w2c"]).reshape(3, 1)
     world_to_cam_matrix = np.concatenate([world_to_cam_R, world_to_cam_T], axis=1)
     # reshaping to 4z4
     world_to_cam_matrix = np.concatenate([world_to_cam_matrix, np.array([[0, 0, 0, 1]])], axis=0)
+    world_to_cam_matrix[:3, 3] = world_to_cam_matrix[:3, 3] / 1000
+    world_to_cam_matrix = world_to_cam_matrix @ rotation_matrix
 
     camera_to_world_matrix = np.array(parameters["camera_world"].item()[f"cam_T_{cam_num}"]).reshape(4, 4)
 
@@ -119,7 +128,7 @@ def show_depth_projection(prefix_path):
         # get camera to world
         # camera_2_world = world_2_camera
         # p_m = camera_2_world
-        p_m = world_2_camera
+        p_m = camera_2_world
         p_m[:3, 3] = p_m[:3, 3] / 1000
         R = p_m[:3, :3]
         T = p_m[:3, 3]
@@ -131,8 +140,8 @@ def show_depth_projection(prefix_path):
             depth_value = depth_data[x, y] / 100
             depth_cam_point = np.dot(np.linalg.inv(K), np.array([x, y, 1])) * depth_value
             
-            world_point = world_2_camera @ np.array([*depth_cam_point, 1])
-            # world_point = (R.T @ depth_cam_point[:3]) + (-R.T @ T).T
+            # world_point = p_m @ np.array([*depth_cam_point, 1])
+            world_point = (R.T @ depth_cam_point[:3]) + (-R.T @ T).T
             pcd_points.append(world_point[:3])
 
 
