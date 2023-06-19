@@ -566,19 +566,19 @@ class SyntheticDataset(Dataset):
         res['vox'] = torch.FloatTensor(vox.matrix).unsqueeze(0)
 
         if self.opt.debug_data:
-            img = np.uint8(
-                (np.transpose(render_data['image'][0][0:3, :, :].numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0)
-            img = np.array(img, dtype=np.uint8).copy()
-            calib = render_data['calib'][0]
-            pts = torch.FloatTensor(res['samples'][:, res['labels'][0] > 0.5]) # [3, N]
-            # pts = res['samples']
-            # pts = torch.FloatTensor(res['feat_points'])
-            print(pts)
-            pts = perspective(pts.unsqueeze(0), calib.unsqueeze(0)).squeeze(0).transpose(0, 1)
-            for p in pts:
-                img = cv2.circle(img, (int(p[0]), int(p[1])), 2, (0, 255, 0), -1)
-            cv2.imwrite('show/test_test.jpg', img)
-            exit(0)
+            for num_view_i in range(self.num_views):
+                img = np.uint8(
+                    (np.transpose(render_data['image'][num_view_i][0:3, :, :].numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0)
+                img = np.array(img, dtype=np.uint8).copy()
+                calib = render_data['calib'][num_view_i]
+                pts = torch.FloatTensor(res['samples'][:, res['labels'][0] > 0.5]) # [3, N]
+                # pts = res['samples']
+                # pts = torch.FloatTensor(res['feat_points'])
+                print(pts)
+                pts = perspective(pts.unsqueeze(0), calib.unsqueeze(0)).squeeze(0).transpose(0, 1)
+                for p in pts:
+                    img = cv2.circle(img, (int(p[0]), int(p[1])), 2, (0, 255, 0), -1)
+                cv2.imwrite(f'show/data_set_2d_rendered_{index}_{num_view_i}.jpg', img)
 
         return res
 

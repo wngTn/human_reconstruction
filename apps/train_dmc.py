@@ -36,12 +36,18 @@ def train(opt):
     np.random.seed(int(time.time()))
     random.seed(int(time.time()))
     torch.manual_seed(int(time.time()))
-    # set cuda
     log = SummaryWriter(opt.log_path)
     total_iteration = 0
     netG = DMCNet(opt, projection_mode='perspective').to(device)
     netN = NormalNet().to(device)
     print('Using Network: ', netG.name, netN.name)
+    if device.type == 'cuda':
+        gpu_ids = [int(i) for i in opt.gpu_ids.split(',')]
+        netG = DataParallel(netG, device_ids=gpu_ids)
+        netN = DataParallel(netN, device_ids=gpu_ids)
+    else:
+        netG = DataParallel(netG)
+        netN = DataParallel(netN)
 
     optimizerG = torch.optim.Adam(netG.parameters(), lr=opt.learning_rate)
     lr = opt.learning_rate
@@ -81,7 +87,7 @@ def train(opt):
     os.makedirs('%s/%s' % (opt.checkpoints_path, opt.name), exist_ok=True)
     os.makedirs('%s/%s' % (opt.results_path, opt.name), exist_ok=True)
 
-    opt_log = os.path.join(opt.results_path, opt.name, 'opt.txt')
+    opt_log = os.path.join(opt.results_path, opt.name, 'opt.json')
     with open(opt_log, 'w') as outfile:
         outfile.write(json.dumps(vars(opt), indent=2))
 
