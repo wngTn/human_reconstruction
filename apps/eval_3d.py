@@ -54,13 +54,13 @@ def inference_nm(opt):
 
     test_netG = netG.module
     netN = netN.module
-    dataset = DMCDataset(opt, phase='inference', yaw_list=opt.yaw_list, cache_data = Manager().dict(), cache_data_lock=Lock())
+    dataset = SyntheticDataset(opt, phase='inference', num_views=4, cache_data = Manager().dict(), cache_data_lock=Lock())
     print(dataset.__len__())
     
     os.makedirs(opt.results_path, exist_ok=True)
     os.makedirs('%s/%s' % (opt.results_path, opt.name), exist_ok=True)
 
-    opt_log = os.path.join(opt.results_path, opt.name, 'opt.txt')
+    opt_log = os.path.join(opt.results_path, opt.name, 'opt.json')
     with open(opt_log, 'w') as outfile:
         outfile.write(json.dumps(vars(opt), indent=2))
 
