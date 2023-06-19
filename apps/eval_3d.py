@@ -71,9 +71,9 @@ def inference_nm(opt):
         for i in tqdm(range(0, len(dataset) // opt.num_views)):
             test_data = dataset[i]
             save_path = '%s/%s/inference_eval_%s_%d.obj' % (
-                opt.results_path, opt.name, test_data['name'], test_data['yid'])
-            if dic.__contains__(test_data['name']):
-                break
+                opt.results_path, opt.name, test_data['name'], i)
+            # if dic.__contains__(test_data['name']):
+            #    break
             dic[test_data['name']] = True
             image_tensor = test_data['image'].to(device=cuda).unsqueeze(0)
             mask_tensor = test_data['mask'].to(device=cuda).unsqueeze(0)
