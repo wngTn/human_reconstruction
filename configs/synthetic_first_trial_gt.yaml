@@ -16,6 +16,12 @@ fine_mlp_dim: [355, 512, 256, 128, 1]
 # smpl
 smpl_faces: lib/data/smplx_multi.obj
 
+load_netN_checkpoint_path: checkpoints/demo/netN_latest
+
+serial_batches: True
+
 # marching cube
 resolution: 256
 mc_threshold: 0.6
+
+# debug_data: True
