@@ -39,8 +39,8 @@ def inference_nm(opt):
     netN = NormalNet().to(cuda)
     print('Using Network: ', netG.name)
     # gpu_ids = [int(i) for i in opt.gpu_ids.split(',')]
-    # netG = DataParallel(netG, device_ids=gpu_ids)
-    # netN = DataParallel(netN, device_ids=gpu_ids)
+    netG = DataParallel(netG)
+    netN = DataParallel(netN)
     # load checkpoints
     if opt.load_netG_checkpoint_path is not None:
         print('loading for net G ...', opt.load_netG_checkpoint_path)
@@ -52,8 +52,8 @@ def inference_nm(opt):
     
     print("loaded finished!")
 
-    test_netG = netG# .module
-    netN = netN# .module
+    test_netG = netG.module
+    netN = netN.module
     dataset = DMCDataset(opt, phase='inference', yaw_list=opt.yaw_list, cache_data = Manager().dict(), cache_data_lock=Lock())
     print(dataset.__len__())
     
