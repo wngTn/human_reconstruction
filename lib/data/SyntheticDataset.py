@@ -334,7 +334,8 @@ class SyntheticDataset(Dataset):
             normal = Image.open(normal_path)
             depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
             depth = depth.astype(np.float32) / 1000.0
-            depth = Image.fromarray(depth)
+            # depth = Image.fromarray(depth)
+            depth = Image.fromarray(depth.astype(np.uint8))
             smpl_norm = Image.open(smpl_norm_path)
 
             imgs_list = [render, depth, normal, mask, smpl_norm]
