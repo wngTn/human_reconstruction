@@ -8,6 +8,7 @@ import cv2
 import torch
 from PIL.ImageFilter import GaussianBlur, MinFilter
 import trimesh
+from trimesh.voxel import creation
 import logging
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -550,8 +551,7 @@ class SyntheticDataset(Dataset):
         transform[1, 3] = 0.5
         mesh.apply_transform(transform)
 
-        vox = mesh.voxelized(pitch=1.0 / 128, method='binvox', bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
-                                exact=True)
+        vox = creation.voxelize(mesh, pitch=1.0/128, bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]), method='binvox', exact=True)
         
         vox.fill()
         res['vox'] = torch.FloatTensor(vox.matrix).unsqueeze(0)
