@@ -33,9 +33,9 @@ class SyntheticDataset(Dataset):
     def modify_commandline_options(parser, is_train):
         return parser
 
-    def __init__(self, opt, cache_data, cache_data_lock, phase='train', num_views=None):
+    def __init__(self, opt, phase='train', num_views=None):
         self.opt = opt
-        self.projection_mode = 'percpective'
+        self.projection_mode = 'perspective'
         self.phase = phase
         # Path setup
         self.root = os.path.join("data", "Synthetic", "first_trial")
@@ -51,7 +51,7 @@ class SyntheticDataset(Dataset):
         #    self.OBJ = opt.obj_path
         # if opt.smpl_path is not None:
         #    self.SMPL = opt.smpl_path
-        self.SMPL = self.OBJ
+        self.SMPL = os.path.join(self.root, 'Obj_Pred')
 
         self.smpl_faces = readobj(opt.smpl_faces)['f']
 
@@ -66,8 +66,6 @@ class SyntheticDataset(Dataset):
         self.num_sample_inout = self.opt.num_sample_inout
 
         self.subjects = self.get_subjects()
-        self.cache_data = cache_data
-        self.cache_data_lock = cache_data_lock
 
         # PIL to tensor
         self.to_tensor = transforms.Compose([
@@ -81,9 +79,6 @@ class SyntheticDataset(Dataset):
             transforms.ColorJitter(brightness=opt.aug_bri, contrast=opt.aug_con, saturation=opt.aug_sat,
                                    hue=opt.aug_hue)
         ])
-
-    def clear_cache(self):
-        self.cache_data.clear()
 
     def get_subjects(self):
         return ["main_subject"]
@@ -207,9 +202,6 @@ class SyntheticDataset(Dataset):
         }
 
     def select_sampling_method(self, index, b_min, b_max):
-        if self.cache_data.__contains__(index):
-            return self.cache_data[index]
-        # print(index, self.cache_data.__len__())
         root_dir = self.OBJ
         if self.phase != 'inference':
             mesh = trimesh.load(os.path.join(root_dir, f'smplx_{str(index).zfill(6)}.obj'))
@@ -240,16 +232,14 @@ class SyntheticDataset(Dataset):
 
         feat_points = torch.zeros(1)
 
-        self.cache_data_lock.acquire()
-        self.cache_data[index] = {
+        sampling_results = {
             'sample_points': sample_points,
             'surface_points': surface_points,
             'inside': inside,
             'feat_points': feat_points
         }
-        self.cache_data_lock.release()
 
-        return self.cache_data[index]
+        return sampling_results
 
     def get_norm(self, frame_id):
         b_min = torch.zeros(3).float()

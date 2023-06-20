@@ -17,7 +17,6 @@ from tqdm import tqdm
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
-from multiprocessing import Process, Manager, Lock
 
 from lib.options import parse_config
 from lib.mesh_util import *
@@ -65,8 +64,8 @@ def train(opt):
     
     print("loaded finished!")
     
-    train_dataset = SyntheticDataset(opt,  cache_data=Manager().dict(), cache_data_lock=Lock(), phase='train', num_views=4)
-    test_dataset = SyntheticDataset(opt,  cache_data=Manager().dict(), cache_data_lock=Lock(), phase='test', num_views=4)
+    train_dataset = SyntheticDataset(opt, phase='train', num_views=4)
+    test_dataset = SyntheticDataset(opt, phase='test', num_views=4)
         
     projection_mode = train_dataset.projection_mode
     print('projection_mode:', projection_mode)

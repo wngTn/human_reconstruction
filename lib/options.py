@@ -47,7 +47,7 @@ def parse_config(argv=None):
     # Training related
     parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2, -1 for CPU mode')
 
-    parser.add_argument('--num_threads', default=1, type=int, help='# sthreads for loading data')
+    parser.add_argument('--num_threads', default=4, type=int, help='# sthreads for loading data')
     parser.add_argument('--serial_batches', action='store_true',
                             help='if true, takes images in order to make batches, otherwise takes them randomly')
     parser.add_argument('--pin_memory', action='store_true', help='pin_memory')

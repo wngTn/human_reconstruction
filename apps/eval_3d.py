@@ -16,7 +16,6 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
-from multiprocessing import Process, Manager, Lock
 
 from lib.options import parse_config
 from lib.mesh_util import *
@@ -54,7 +53,7 @@ def inference_nm(opt):
 
     test_netG = netG.module
     netN = netN.module
-    dataset = SyntheticDataset(opt, phase='inference', num_views=4, cache_data = Manager().dict(), cache_data_lock=Lock())
+    dataset = SyntheticDataset(opt, phase='inference', num_views=4)
     print(dataset.__len__())
     
     os.makedirs(opt.results_path, exist_ok=True)
