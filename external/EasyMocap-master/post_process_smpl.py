@@ -82,8 +82,6 @@ def main(input_dir, output_dir):
     smpl_json_file = Path(input_dir).glob("*.json")
 
     for j, smpl_file in (process_bar:=tqdm(enumerate(smpl_json_file), desc="Processing SMPL files")): 
-        if j >= 5:
-            break
         process_bar.set_postfix(file=smpl_file)
         frame_meshes, frame_ids = load_mesh(smpl_file)
         for i in range(len(frame_meshes)):
