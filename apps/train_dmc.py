@@ -29,7 +29,6 @@ from lib.model import *
 opt = parse_config()
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-print("Using device: %s" % device)
 
 def train(opt):
     np.random.seed(int(time.time()))

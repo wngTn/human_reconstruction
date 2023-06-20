@@ -1,9 +1,11 @@
 name: synthetic_first_trial_gt
 log_path: logs/synthetic_first_trial_gt
 gpu_ids: 0
-num_threads: 1
+num_threads: 4
 batch_size: 1
 infer: False
+
+coarse_part: True
 
 # data
 num_views: 4
