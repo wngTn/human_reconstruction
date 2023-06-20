@@ -16,7 +16,7 @@ mlp_dim: [323, 1024, 512, 256, 128, 1]
 fine_mlp_dim: [355, 512, 256, 128, 1]
 
 # smpl
-smpl_faces: lib/data/smplx_multi.obj
+smpl_faces: lib/data/smpl_open3d.obj
 
 load_netN_checkpoint_path: checkpoints/demo/netN_latest
 
