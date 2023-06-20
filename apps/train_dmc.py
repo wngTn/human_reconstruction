@@ -4,7 +4,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-import threading
+
+from pathlib import Path
 import time
 import json
 import numpy as np
@@ -101,6 +102,8 @@ def train(opt):
         random.seed(int(time.time()))
         torch.manual_seed(int(time.time()))
         train_bar = tqdm(enumerate(train_data_loader))
+        save_path = Path(opt.results_path) / opt.name 
+        save_path.mkdir(parents=True, exist_ok=True)
         for train_idx, train_data in train_bar:
             total_iteration += 1
             iter_start_time = time.time()
@@ -140,10 +143,10 @@ def train(opt):
                 torch.save(optimizerG.state_dict(), '%s/%s/optim_epoch_%d' % (opt.checkpoints_path, opt.name, epoch))
 
             if train_idx % opt.freq_save_ply == 0:
-                save_path = '%s/%s/pred.ply' % (opt.results_path, opt.name)
+                ply_save_path = Path(save_path) / f"{train_idx}.ply"
                 r = res[0].cpu()
                 points = train_data['samples'][0].transpose(0, 1).cpu()
-                save_samples_truncted_prob(save_path, points.detach().numpy(), r.detach().numpy())
+                save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
 
             iter_data_time = time.time()
 
