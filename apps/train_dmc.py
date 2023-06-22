@@ -98,11 +98,11 @@ def train(opt):
         epoch_start_time = time.time()
         set_train()
         iter_data_time = time.time()
-        np.random.seed(int(time.time()))
-        random.seed(int(time.time()))
-        torch.manual_seed(int(time.time()))
+        # np.random.seed(int(time.time()))
+        # random.seed(int(time.time()))
+        # torch.manual_seed(int(time.time()))
         train_bar = tqdm(enumerate(train_data_loader))
-        save_path = Path(opt.results_path) / opt.name 
+        save_path = Path(opt.results_path) / opt.name / str(epoch)
         save_path.mkdir(parents=True, exist_ok=True)
         for train_idx, train_data in train_bar:
             total_iteration += 1
