@@ -23,6 +23,8 @@ from lib.geometry import *
 from lib.sample_util import *
 from lib.mesh_util import *
 from lib.train_util import find_border
+import lib.data.binvox_rw as binvox_rw
+import subprocess
 
 
 log = logging.getLogger('trimesh')
@@ -550,11 +552,19 @@ class SyntheticDataset(Dataset):
 
         transform[1, 3] = 0.5
         mesh.apply_transform(transform)
+        with TemporaryDirectory() as folder:
+            model_path = os.path.join(folder, 'model.off')
+            with open(model_path, 'wb') as fp:
+                mesh.export(fp, file_type="off")
+            subprocess.run( ["./binvox", "-d", "128", "-t", "binvox", "-e", "-bb", "-0.5", "0.0", "-0.5", "0.5", "1.0", "0.5", model_path], stdout=subprocess.DEVNULL)
 
-        vox = creation.voxelize(mesh, pitch=1.0/128, bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]), method='binvox', exact=True)
+            with open(model_path[:-4] + ".binvox", 'rb') as f:
+                model = binvox_rw.read_as_3d_array(f)
+
+        # vox = creation.voxelize(mesh, pitch=1.0/128, bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]), method='binvox', exact=True)
         
-        vox.fill()
-        res['vox'] = torch.FloatTensor(vox.matrix).unsqueeze(0)
+        # vox.fill()
+        res['vox'] = torch.FloatTensor(model.data).unsqueeze(0)
 
         if self.opt.debug_data:
             for num_view_i in range(self.num_views):
@@ -577,6 +587,29 @@ class SyntheticDataset(Dataset):
         if index == 0:
             index = self.__len__()
         return self.get_item(index)
+
+
+import shutil
+import tempfile
+class TemporaryDirectory(object):
+    """
+    Same basic usage as tempfile.TemporaryDirectory
+    but functional in Python 2.7+.
+
+    Example
+    ---------
+    ```
+    with trimesh.util.TemporaryDirectory() as path:
+       writable = os.path.join(path, 'hi.txt')
+    ```
+    """
+
+    def __enter__(self):
+        self.path = tempfile.mkdtemp(dir="./tmp")
+        return self.path
+
+    def __exit__(self, *args, **kwargs):
+        shutil.rmtree(self.path)
 
 
 
