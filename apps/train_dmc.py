@@ -110,10 +110,9 @@ def train(opt):
         np.random.seed(int(time.time()))
         random.seed(int(time.time()))
         torch.manual_seed(int(time.time()))
-        train_bar = tqdm(enumerate(train_data_loader))
         save_path = Path(opt.results_path) / opt.name / str(epoch)
         save_path.mkdir(parents=True, exist_ok=True)
-        for train_idx, train_data in train_bar:
+        for train_idx, train_data in enumerate(train_data_loader):
             total_iteration += 1
             iter_start_time = time.time()
             # retrieve the data
@@ -138,7 +137,7 @@ def train(opt):
 
             log.add_scalar('loss', error.item(), total_iteration)
 
-            if train_idx % opt.val_step == 0:
+            if train_idx % opt.freq_val == 0:
                 print("Performing Validation Now")
                 val_loss = validate(opt, netG, netN, val_data_loader, train_idx + (epoch * len(train_dataset)))
                 # log.add_scalar('val_loss', val_loss, epoch)
@@ -150,7 +149,7 @@ def train(opt):
                     iter_start_time - iter_data_time,
                     iter_net_time - iter_start_time, int(eta // 60),
                     int(eta - 60 * (eta // 60)))
-                train_bar.set_description(descrip)
+                print(descrip)
 
             if train_idx % opt.freq_save == 0:
                 torch.save(netG.state_dict(), '%s/%s/netG_latest' % (opt.checkpoints_path, opt.name))
