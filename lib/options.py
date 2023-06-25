@@ -29,8 +29,9 @@ def parse_config(argv=None):
     
     # Datasets related
     parser.add_argument('--log_path', type=str, default='./train_log')
-    parser.add_argument('--dataroot', type=str, default='./data',
-                        help='path to images (data folder)')
+    parser.add_argument('--train_dataroot', type=str, required=True,
+                        help='path to all train data')
+    parser.add_argument('--val_dataroot', type=str, required=True, help='path to all val data')
     parser.add_argument('--obj_path', type=str)
     parser.add_argument('--smpl_path', type=str)
     parser.add_argument('--tex_path', type=str)
@@ -38,6 +39,8 @@ def parse_config(argv=None):
     parser.add_argument('--b_min', nargs='+', default=[-3, -2, -3], type=float)
     parser.add_argument('--b_max', nargs='+', default=[3, 14, 3], type=float)
     parser.add_argument('--smpl_faces', type=str, default='/media/data1/shaoruizhi/Multiview_Pair/lib/data/smplx_fine.obj')
+
+    parser.add_argument('--overfitting', action='store_true', help='overfitting on a single frame')
 
     # Experiment related
     parser.add_argument('--num_views', type=int, default=1, help='How many views to use for multiview network.')
@@ -61,6 +64,8 @@ def parse_config(argv=None):
     parser.add_argument('--freq_save', type=int, default=50, help='freqency of the save_checkpoints')
     parser.add_argument('--freq_save_ply', type=int, default=100, help='freqency of the save ply')
     parser.add_argument('--freq_normal_show', type=int, default=1000, help='freqency of the save ply')
+
+    parser.add_argument('--freq_val', type=int, default=100, help='freqency validation')
 
     # Testing related
     parser.add_argument('--resolution', type=int, default=256, help='# of grid in mesh reconstruction')

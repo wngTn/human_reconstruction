@@ -41,20 +41,20 @@ class SyntheticDataset(Dataset):
         self.projection_mode = 'perspective'
         self.phase = phase
         # Path setup
-        self.root = os.path.join("data", "Synthetic", "first_trial")
+        self.root = opt.train_dataroot if phase == 'train' else opt.val_dataroot
         self.RENDER = os.path.join(self.root, 'RGB')
         self.PARAM = os.path.join(self.root, 'output_data.npz')
         self.OBJ = os.path.join(self.root, 'Obj')
+        self.SMPL = os.path.join(self.root, 'Obj_Pred')
         self.DEPTH = os.path.join(self.root, 'Depth')
         self.NORMAL = os.path.join(self.root, 'Normal')
         self.SMPL_NORMAL = os.path.join(self.root, 'smpl_pos')
         self.MASK = os.path.join(self.root, 'Segmentation')
 
-        # if opt.obj_path is not None:
-        #    self.OBJ = opt.obj_path
-        # if opt.smpl_path is not None:
-        #    self.SMPL = opt.smpl_path
-        self.SMPL = os.path.join(self.root, 'Obj_Pred')
+        if opt.obj_path is not None:
+           self.OBJ = os.path.join(self.root, opt.obj_path)
+        if opt.smpl_path is not None:
+           self.SMPL = os.path.join(self.root, opt.smpl_path)
 
         self.smpl_faces = readobj(opt.smpl_faces)['f']
 
@@ -83,11 +83,13 @@ class SyntheticDataset(Dataset):
                                    hue=opt.aug_hue)
         ])
 
+        self.overfitting = opt.overfitting
+
     def get_subjects(self):
         return ["main_subject"]
 
     def __len__(self):
-        return 223
+        return len(os.listdir(self.SMPL)) if not self.overfitting else 1
 
     def visibility_sample(self, data, depth, calib, mask=None):
         surface_points = data['surface_points']
@@ -491,7 +493,6 @@ class SyntheticDataset(Dataset):
             'sid': subject_id,
         }
 
-
         render_data = self.load_render_data(index)
         res.update(render_data) 
         norm_parameter = self.get_norm(index)
@@ -552,19 +553,9 @@ class SyntheticDataset(Dataset):
 
         transform[1, 3] = 0.5
         mesh.apply_transform(transform)
-        with TemporaryDirectory() as folder:
-            model_path = os.path.join(folder, 'model.off')
-            with open(model_path, 'wb') as fp:
-                mesh.export(fp, file_type="off")
-            subprocess.run( ["./binvox", "-d", "128", "-t", "binvox", "-e", "-bb", "-0.5", "0.0", "-0.5", "0.5", "1.0", "0.5", model_path], stdout=subprocess.DEVNULL)
-
-            with open(model_path[:-4] + ".binvox", 'rb') as f:
-                model = binvox_rw.read_as_3d_array(f)
-
-        # vox = creation.voxelize(mesh, pitch=1.0/128, bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]), method='binvox', exact=True)
-        
-        # vox.fill()
-        res['vox'] = torch.FloatTensor(model.data).unsqueeze(0)
+        vox = creation.voxelize(mesh, pitch=1.0/128, bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]), method='binvox', exact=True)
+        vox.fill()
+        res['vox'] = torch.FloatTensor(vox.matrix).unsqueeze(0)
 
         if self.opt.debug_data:
             for num_view_i in range(self.num_views):
@@ -584,34 +575,7 @@ class SyntheticDataset(Dataset):
         return res
 
     def __getitem__(self, index):
-        if index == 0:
-            index = self.__len__()
-        return self.get_item(index)
-
-
-import shutil
-import tempfile
-class TemporaryDirectory(object):
-    """
-    Same basic usage as tempfile.TemporaryDirectory
-    but functional in Python 2.7+.
-
-    Example
-    ---------
-    ```
-    with trimesh.util.TemporaryDirectory() as path:
-       writable = os.path.join(path, 'hi.txt')
-    ```
-    """
-
-    def __enter__(self):
-        self.path = tempfile.mkdtemp(dir="./tmp")
-        return self.path
-
-    def __exit__(self, *args, **kwargs):
-        shutil.rmtree(self.path)
-
-
+        return self.get_item(index + 1)
 
 # get options
 opt = parse_config()
