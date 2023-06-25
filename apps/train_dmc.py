@@ -162,7 +162,7 @@ def train(opt):
         
         # update learning rate
         lr = adjust_learning_rate(optimizerG, epoch, lr, [5, 10, 25], 0.1)
-        train_dataset.clear_cache()
+        # train_dataset.clear_cache()
 
     log.close()
 

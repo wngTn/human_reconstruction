@@ -17,7 +17,7 @@ mlp_dim: [323, 1024, 512, 256, 128, 1]
 fine_mlp_dim: [355, 512, 256, 128, 1]
 
 # path
-load_netG_checkpoint_path: T:/at3dcv_project/checkpoints/TonyIsTheBest/netG_latest
+load_netG_checkpoint_path: T:\at3dcv_project\checkpoints\TonyIsTheBest2333_Coarse\netG_latest
 load_netN_checkpoint_path: checkpoints/demo/netN_latest
 
 # smpl

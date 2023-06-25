@@ -16,8 +16,9 @@ mlp_dim: [323, 1024, 512, 256, 128, 1]
 fine_mlp_dim: [355, 512, 256, 128, 1]
 
 # smpl
-smpl_faces: lib/data/smpl_open3d.obj
+smpl_faces: lib/data/smplx_multi.obj
 
+# load_netG_checkpoint_path: T:\at3dcv_project\checkpoints\TonyIsTheBest233\netG_epoch_0
 load_netN_checkpoint_path: checkpoints/demo/netN_latest
 
 serial_batches: True
