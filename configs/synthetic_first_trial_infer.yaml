@@ -1,0 +1,30 @@
+name: synthetic_first_trial_gt
+log_path: logs/synthetic_first_trial_gt
+gpu_ids: 0
+num_threads: 1
+batch_size: 1
+infer: True
+infer_reverse: False
+
+# data 
+num_views: 4
+# [0, 90, 180, 270]
+flip_x: False
+
+# network
+fine_part: False
+mlp_dim: [323, 1024, 512, 256, 128, 1]
+fine_mlp_dim: [355, 512, 256, 128, 1]
+
+# path
+load_netG_checkpoint_path: T:/at3dcv_project/checkpoints/TonyIsTheBest/netG_latest
+load_netN_checkpoint_path: checkpoints/demo/netN_latest
+
+# smpl
+smpl_faces: lib/data/smplx_multi.obj
+# smplx_correction.obj
+# smplx_fine.obj      ### -> error: indexes dont match
+
+# marching cube
+resolution: 512
+mc_threshold: 0.5

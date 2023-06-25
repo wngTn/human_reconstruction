@@ -1,0 +1,47 @@
+{
+    "info": {
+        "description": "'Demo'Dataset",
+        "url": "",
+        "version": "",
+        "year": 2020,
+        "contributor": "yunqiuxu",
+        "date_created": "2023-05-30 15:17:44.995687"
+    },
+    "licenses": [
+        {
+            "id": 1,
+            "name": "",
+            "url": ""
+        }
+    ],
+    "categories": [
+        {
+            "id": 1,
+            "name": "person",
+            "supercategory": "person"
+        }
+    ],
+    "images": [
+        {
+            "id": 1,
+            "file_name": "0.jpg",
+            "width": 512,
+            "height": 512,
+            "date_captured": "2023-05-30 15:17:44.994688",
+            "license": 1,
+            "coco_url": "",
+            "flickr_url": ""
+        },
+        {
+            "id": 2,
+            "file_name": "demo.jpg",
+            "width": 1200,
+            "height": 900,
+            "date_captured": "2023-05-30 15:17:44.994688",
+            "license": 1,
+            "coco_url": "",
+            "flickr_url": ""
+        }
+    ],
+    "annotations": []
+}
