@@ -26,7 +26,7 @@ from lib.model import *
 from lib.geometry import index
 
 import matplotlib
-matplotlib.use('AGG')
+# matplotlib.use('AGG')
 
 # get options
 opt = parse_config()
