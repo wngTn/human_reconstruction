@@ -115,6 +115,8 @@ def train(opt):
         save_path = Path(opt.results_path) / opt.name / str(epoch)
         save_path.mkdir(parents=True, exist_ok=True)
         for train_idx, train_data in train_bar:
+            if train_idx >= 1:
+                break
             total_iteration += 1
             iter_start_time = time.time()
             # retrieve the data
@@ -183,7 +185,7 @@ def validate(netG, netN, val_data_loader, train_idx):
             netN.eval()
             
             for i, val_data in tqdm(enumerate(val_data_loader), total=20):
-                if i >= 20:
+                if i >= 1:
                     break
                 for key in val_data:
                     if torch.is_tensor(val_data[key]):
@@ -245,7 +247,8 @@ def validate(netG, netN, val_data_loader, train_idx):
                 # chamfer = evaluation(save_root, target_root)
                 # total_loss += chamfer
 
-        return total_err / 20
+        return total_err 
+# / 20
 
 
 if __name__ == '__main__':

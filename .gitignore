@@ -5,10 +5,15 @@ external/Self-Correction-Human-Parsing/mhp_extension/data/*
 external/Self-Correction-Human-Parsing/checkpoints/*
 external/Self-Correction-Human-Parsing/mhp_extension/pretrain_model/*
 
+logs/*
+val_vis/*
+meetings/**/*.png
+
 binvox
 results/*
 checkpoints/*
 .vscode/*
+binvox*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

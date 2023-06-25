@@ -27,7 +27,6 @@ def read_norm_smpl(path, smpl_faces, synthetic, flip_normal=False, init_rot=None
     obj['vn'] = vn
 
     # For synthetic data: first perform axis transform for smpl model
-    print(synthetic)
     if synthetic:
         d = 90
         rotation_matrix = np.array([
@@ -68,9 +67,9 @@ def render_smpl_global_normal(dataroot, obj_path, faces_path, res=(1024, 1024), 
     # obj_list = os.listdir(obj_path)
     # obj = read_norm_smpl(os.path.join(obj_path, obj_list[0], 'smplx.obj'), faces_path, synthetic, flip_normal, init_rot)
     # import ipdb; ipdb.set_trace()
-    if synthetic:
-        obj_list = list(filter(lambda x : x.endswith(".obj"), os.listdir(obj_path)))
-        obj = read_norm_smpl(os.path.join(obj_path, obj_list[0]), faces_path, synthetic, flip_normal, init_rot)
+    # if synthetic:
+    obj_list = list(filter(lambda x : x.endswith(".obj"), os.listdir(obj_path)))
+    obj = read_norm_smpl(os.path.join(obj_path, obj_list[0]), faces_path, synthetic, flip_normal, init_rot)
     model = t3.Model(obj=obj, col_n=obj['vi'].shape[0])
     
     scene = t3.Scene()

@@ -26,7 +26,7 @@ from lib.model import *
 from lib.geometry import index
 
 import matplotlib
-matplotlib.use('AGG')
+# matplotlib.use('AGG')
 
 # get options
 opt = parse_config()
@@ -67,10 +67,12 @@ def inference_nm(opt):
         test_netG.eval()
         dic = {}
         print('generate mesh (inference) ...')
-        for i in tqdm(range(0, len(dataset) // opt.num_views)):
+        # for i in tqdm(range(0, len(dataset) // opt.num_views)):
+        for i in tqdm(range(20)):
             test_data = dataset[i]
-            save_path = '%s/%s/inference_eval_%s_%d.obj' % (
-                opt.results_path, opt.name, test_data['name'], i)
+            save_path = '%s/inference_eval_%s_%d.obj' % (opt.results_path, test_data['name'], i)
+            # save_path = '%s/%s/inference_eval_%s_%d.obj' % (
+                # opt.results_path, opt.name, test_data['name'], i)
             # if dic.__contains__(test_data['name']):
             #    break
             dic[test_data['name']] = True

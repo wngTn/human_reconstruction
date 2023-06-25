@@ -25,7 +25,7 @@ from lib.mesh_util import *
 from lib.train_util import find_border
 import lib.data.binvox_rw as binvox_rw
 import subprocess
-
+import OpenEXR
 
 log = logging.getLogger('trimesh')
 log.setLevel(40)
@@ -41,7 +41,17 @@ class SyntheticDataset(Dataset):
         self.projection_mode = 'perspective'
         self.phase = phase
         # Path setup
-        self.root = os.path.join("data", "Synthetic", "first_trial")
+        # self.root = os.path.join("data", "Synthetic", "first_trial")
+        self.root = opt.dataroot
+        self.suffix = '.exr'
+        if phase == 'validation':
+        #     self.root = opt.val_root
+            opt.num_sample_inout = 2500
+        #     self.suffix = '.png'
+        # elif phase == 'inference':
+        #     if 'val' in self.root:
+        #         self.suffix = '.png'
+
         self.RENDER = os.path.join(self.root, 'RGB')
         self.PARAM = os.path.join(self.root, 'output_data.npz')
         self.OBJ = os.path.join(self.root, 'Obj')
@@ -54,12 +64,13 @@ class SyntheticDataset(Dataset):
         #    self.OBJ = opt.obj_path
         # if opt.smpl_path is not None:
         #    self.SMPL = opt.smpl_path
-        self.SMPL = os.path.join(self.root, 'Obj_Pred')
-
+        self.SMPL = os.path.join(self.root, 'Obj')
+        # self.SMPL = os.path.join(self.root, 'Obj_Pred')
+        
         self.smpl_faces = readobj(opt.smpl_faces)['f']
 
         self.is_train = (phase == 'train')
-        self.phase = phase
+        # self.phase = phase
         self.load_size = self.opt.loadSize
 
         self.num_views = self.opt.num_views
@@ -314,8 +325,8 @@ class SyntheticDataset(Dataset):
 
         for cam_id in range(self.num_views):
             render_path = os.path.join(self.RENDER, f"r_{frame_id}_{cam_id}_rgb.png")
-            depth_path = os.path.join(self.DEPTH, f"r_{frame_id}_{cam_id}_depth_{str(frame_id).zfill(4)}.png")
-            normal_path = os.path.join(self.NORMAL, f"r_{frame_id}_{cam_id}_normal_{str(frame_id).zfill(4)}.png")
+            depth_path = os.path.join(self.DEPTH, f"r_{frame_id}_{cam_id}_depth_{str(frame_id).zfill(4)}{self.suffix}")  # png or exr
+            normal_path = os.path.join(self.NORMAL, f"r_{frame_id}_{cam_id}_normal_{str(frame_id).zfill(4)}{self.suffix}")   # png or exr
             smpl_norm_path = os.path.join(self.SMPL_NORMAL, f'r_{frame_id}_{cam_id}_global_smpl.png')
             mask_path = os.path.join(self.MASK, f"r_{frame_id}_{cam_id}_segmentation_{str(frame_id).zfill(4)}.png")
 
@@ -324,11 +335,38 @@ class SyntheticDataset(Dataset):
 
             mask = Image.open(mask_path).convert('RGB')
             render = Image.open(render_path).convert('RGB')
-            normal = Image.open(normal_path)
-            depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
-            depth = depth.astype(np.float32) / 1000.0
-            # depth = Image.fromarray(depth)
-            depth = Image.fromarray(depth.astype(np.uint8))
+
+            def convert_exr2img(path):
+                exr_file = OpenEXR.InputFile(path)
+                dw = exr_file.header()['dataWindow']
+                size = (dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1)
+
+                # import ipdb; ipdb.set_trace()
+                channel_names = exr_file.header()['channels'].keys()
+                channels = [np.frombuffer(exr_file.channel(c), dtype=np.float16) for c in channel_names]
+                # The image data is stored in a flat array, so reshape it to the appropriate size
+                image = np.concatenate(channels).reshape((len(channels), size[1], size[0]))
+                return image
+            
+            if normal_path.endswith('.png'):
+                normal = Image.open(normal_path)
+            elif normal_path.endswith('.exr'):
+                normal = convert_exr2img(normal_path) 
+                normal = Image.fromarray(np.transpose(normal, (1, 2, 0)).astype(np.uint8))
+            else:
+                raise ValueError('Unsupported format: {}'.format(normal_path))
+
+            if depth_path.endswith('.png'):
+                depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+                depth = depth.astype(np.float32) / 1000.0
+                # depth = Image.fromarray(depth)
+                depth = Image.fromarray(depth.astype(np.uint8))
+            elif depth_path.endswith('.exr'):
+                depth = convert_exr2img(depth_path)
+                depth = Image.fromarray((np.transpose(depth, (1, 2, 0)) / 1000.0).astype(np.uint8))
+            else:
+                raise ValueError('Unsupported format: {}'.format(depth_path))
+
             smpl_norm = Image.open(smpl_norm_path)
 
             imgs_list = [render, depth, normal, mask, smpl_norm]
@@ -502,7 +540,7 @@ class SyntheticDataset(Dataset):
             sample_data = self.visibility_sample(sample_data, res['depth'], res['calib'], res['mask'])
         res.update(sample_data)
 
-        mesh = trimesh.load(os.path.join(self.SMPL, f'smpl_{str(index).zfill(6)}.obj'))
+        mesh = trimesh.load(os.path.join(self.SMPL, f'smplx_{str(index).zfill(6)}.obj'))
         res['extrinsic'][0, :, :] = 0
         for i in range(3):
             res['extrinsic'][0, i, i] = 1
@@ -552,19 +590,19 @@ class SyntheticDataset(Dataset):
 
         transform[1, 3] = 0.5
         mesh.apply_transform(transform)
-        with TemporaryDirectory() as folder:
-            model_path = os.path.join(folder, 'model.off')
-            with open(model_path, 'wb') as fp:
-                mesh.export(fp, file_type="off")
-            subprocess.run( ["./binvox", "-d", "128", "-t", "binvox", "-e", "-bb", "-0.5", "0.0", "-0.5", "0.5", "1.0", "0.5", model_path], stdout=subprocess.DEVNULL)
+        # with TemporaryDirectory() as folder:
+        #     model_path = os.path.join(folder, 'model.off')
+        #     with open(model_path, 'wb') as fp:
+        #         mesh.export(fp, file_type="off")
+        #     subprocess.run( ["./binvox", "-d", "128", "-t", "binvox", "-e", "-bb", "-0.5", "0.0", "-0.5", "0.5", "1.0", "0.5", model_path], stdout=subprocess.DEVNULL)
 
-            with open(model_path[:-4] + ".binvox", 'rb') as f:
-                model = binvox_rw.read_as_3d_array(f)
+        #     with open(model_path[:-4] + ".binvox", 'rb') as f:
+        #         model = binvox_rw.read_as_3d_array(f)
 
-        # vox = creation.voxelize(mesh, pitch=1.0/128, bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]), method='binvox', exact=True)
+        vox = creation.voxelize(mesh, pitch=1.0/128, bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]), method='binvox', exact=True)
         
-        # vox.fill()
-        res['vox'] = torch.FloatTensor(model.data).unsqueeze(0)
+        vox.fill()
+        res['vox'] = torch.FloatTensor(vox.matrix).unsqueeze(0)
 
         if self.opt.debug_data:
             for num_view_i in range(self.num_views):
@@ -584,9 +622,9 @@ class SyntheticDataset(Dataset):
         return res
 
     def __getitem__(self, index):
-        if index == 0:
-            index = self.__len__()
-        return self.get_item(index)
+        # if index == 0:
+            # index = self.__len__()
+        return self.get_item(index+1)
 
 
 import shutil
@@ -605,7 +643,7 @@ class TemporaryDirectory(object):
     """
 
     def __enter__(self):
-        self.path = tempfile.mkdtemp(dir="./tmp")
+        self.path = tempfile.mkdtemp(dir="T:/at3dcv_project/tmp")
         return self.path
 
     def __exit__(self, *args, **kwargs):
