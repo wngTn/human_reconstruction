@@ -20,7 +20,7 @@ fine_mlp_dim: [355, 512, 256, 128, 1]
 train_dataroot: data/Synthetic/first_trial
 val_dataroot: data/Synthetic/first_trial
 
-freq_val: 5
+freq_val: 2
 
 # smpl
 # necessary because ground truth is smplx

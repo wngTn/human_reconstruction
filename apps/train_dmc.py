@@ -29,6 +29,7 @@ from lib.model import *
 import trimesh
 import trimesh.proximity
 import trimesh.sample
+import copy 
 
 # get options
 opt = parse_config()
@@ -69,7 +70,10 @@ def train(opt):
     print("loaded finished!")
     
     train_dataset = SyntheticDataset(opt, phase='train', num_views=4)
-    val_dataset = SyntheticDataset(opt, phase='validation', num_views=4)
+    # opt_val = copy.deepcopy(opt)
+    # opt_val.infer = True
+    # opt_val.infer_reverse = True
+    val_dataset = SyntheticDataset(opt, phase='train', num_views=4)
         
     projection_mode = train_dataset.projection_mode
     print('projection_mode:', projection_mode)
@@ -137,12 +141,6 @@ def train(opt):
 
             log.add_scalar('loss', error.item(), total_iteration)
 
-            if train_idx % opt.freq_val == 0:
-                print("Performing Validation Now")
-                val_loss = validate(opt, netG, netN, val_data_loader, train_idx + (epoch * len(train_dataset)))
-                # log.add_scalar('val_loss', val_loss, epoch)
-                print('Current val loss: ', val_loss)
-
             if train_idx % opt.freq_plot == 0:
                 descrip = 'Name: {0} | Epoch: {1} | {2}/{3} | Err: {4:.06f} | LR: {5:.06f} | Sigma: {6:.02f} | dataT: {7:.05f} | netT: {8:.05f} | ETA: {9:02d}:{10:02d}'.format(
                     opt.name, epoch, train_idx, len(train_data_loader), error.item(), lr, opt.sigma,
@@ -157,13 +155,21 @@ def train(opt):
                 torch.save(optimizerG.state_dict(), '%s/%s/optim_latest' % (opt.checkpoints_path, opt.name))
                 torch.save(optimizerG.state_dict(), '%s/%s/optim_epoch_%d' % (opt.checkpoints_path, opt.name, epoch))
 
-            # if train_idx % opt.freq_save_ply == 0:
-            #     ply_save_path = Path(save_path) / f"{train_idx}.ply"
-            #     r = res[0].cpu()
-            #     points = train_data['samples'][0].transpose(0, 1).cpu()
-            #     save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+
 
             iter_data_time = time.time()
+
+        if epoch % opt.freq_val == 0 and epoch != 0:
+            ply_save_path = Path(save_path) / f"{epoch}.ply"
+            r = res[0].cpu()
+            points = train_data['samples'][0].transpose(0, 1).cpu()
+            save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+
+            print("Performing Validation Now")
+            val_loss = validate(opt, netG, netN, val_data_loader, train_idx + (epoch * len(train_dataset)))
+            # log.add_scalar('val_loss', val_loss, epoch)
+            print('Current val loss: ', val_loss)
+
         
         # update learning rate
         lr = adjust_learning_rate(optimizerG, epoch, lr, [5, 10, 25], 0.1)
@@ -171,38 +177,45 @@ def train(opt):
 
     log.close()
 
+def points_to_voxel_grid(points, probs, voxel_grid_shape):
+    # Step 1: Normalize the points
+    min_coords = torch.min(points, dim=1)[0]
+    max_coords = torch.max(points, dim=1)[0]
+    range_coords = max_coords - min_coords
+    norm_points = (points - min_coords.unsqueeze(1)) / range_coords.unsqueeze(1)
+
+    # Step 2: Scale and discretize the points
+    discretized_points = torch.round(norm_points * (torch.Tensor(voxel_grid_shape) - 1).unsqueeze(-1)).long()
+
+    # Step 3: Create the voxel grid and fill with probabilities
+    voxel_grid = torch.zeros(*voxel_grid_shape)
+    voxel_grid[discretized_points[0], discretized_points[1], discretized_points[2]] = probs
+
+    return voxel_grid
+
 def validate(opt, netG, netN, val_data_loader, train_idx):
+        os.makedirs("val_vis", exist_ok=True)
         total_err = 0
+        # netG.eval()
+        # netN.eval()
 
         with torch.no_grad():
-            netG.eval()
-            netN.eval()
             
-            for i, val_data in tqdm(enumerate(val_data_loader), total=len(val_data_loader)):
+            for i, val_data in enumerate(val_data_loader):
                 for key in val_data:
                     if torch.is_tensor(val_data[key]):
                         val_data[key] = val_data[key].to(device=device)
 
-                # predict normal
                 net_normal = netN.forward(val_data['image'])
                 net_normal = net_normal * val_data['mask']
-                
+            
                 val_data['normal'] = net_normal.detach()
-                res, error = netG.forward(val_data)
+                res, error = netG.forward(val_data) 
 
-                ply_save_path = Path("val_vis") / f"pred_{train_idx + i}_pointcloud.ply"
-                r = res[0].cpu()
-                points = val_data['samples'][0].transpose(0, 1).cpu()
-                save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+                vox_grid = points_to_voxel_grid(val_data["samples"][0].cpu().detach(), res[0].cpu().detach(), (128, 128, 128))
+                verts, faces, normals, values = measure._marching_cubes_lewiner.marching_cubes(vox_grid.numpy(), 0.5)
+                save_obj_mesh(os.path.join(f"val_vis/{train_idx}.obj"), verts, faces)
 
-                ply_gt_path = Path("val_vis") / f"gt_{train_idx + i}_pointcloud.ply"
-                save_samples_truncted_prob(ply_gt_path, points.detach().numpy(), val_data['labels'][0].cpu().detach().numpy())
-
-                mesh_pred_path = Path("val_vis") / f"pred_{train_idx + i}_mesh.obj"
-                print("Starting with mesh generation")
-                gen_mesh_dmc(opt, netG, device, val_data, str(mesh_pred_path), threshold=0.5, use_octree=True)
-                print("Saved mesh under: ", mesh_pred_path)
-                total_err += error        
 
         return total_err / len(val_data_loader)
 
