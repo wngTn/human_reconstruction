@@ -37,7 +37,10 @@ def parse_config(argv=None):
     parser.add_argument('--loadSize', type=int, default=512, help='load size of input image')
     parser.add_argument('--b_min', nargs='+', default=[-3, -2, -3], type=float)
     parser.add_argument('--b_max', nargs='+', default=[3, 14, 3], type=float)
-    parser.add_argument('--smpl_faces', type=str, default='/media/data1/shaoruizhi/Multiview_Pair/lib/data/smplx_fine.obj')
+    parser.add_argument('--smpl_faces', type=str, default='lib/data/smplx_fine.obj')
+
+    parser.add_argument('--val_root', type=str, default='./data/val_data',
+                        help='path to validation data folder')
 
     # Experiment related
     parser.add_argument('--num_views', type=int, default=1, help='How many views to use for multiview network.')
@@ -55,6 +58,8 @@ def parse_config(argv=None):
     parser.add_argument('--batch_size', type=int, default=2, help='input batch size')
     parser.add_argument('--learning_rate', type=float, default=1e-3, help='adam learning rate')
     parser.add_argument('--num_epoch', type=int, default=1000, help='num epoch to train')
+
+    parser.add_argument('--val_step', type=int, default=50, help='num of train iterations for validation')
 
     
     parser.add_argument('--freq_plot', type=int, default=10, help='freqency of the save_checkpoints')
