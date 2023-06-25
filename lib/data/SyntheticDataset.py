@@ -42,7 +42,7 @@ class SyntheticDataset(Dataset):
         self.phase = phase
         # Path setup
         # self.root = os.path.join("data", "Synthetic", "first_trial")
-        self.root = opt.dataroot
+        self.root = opt.train_dataroot
         self.RENDER = os.path.join(self.root, 'RGB')
         self.PARAM = os.path.join(self.root, 'output_data.npz')
         self.OBJ = os.path.join(self.root, 'Obj')
@@ -50,7 +50,7 @@ class SyntheticDataset(Dataset):
         self.NORMAL = os.path.join(self.root, 'Normal')
         self.SMPL_NORMAL = os.path.join(self.root, 'smpl_pos')
         self.MASK = os.path.join(self.root, 'Segmentation')
-        self.VAL_ROOT = opt.val_root
+        self.VAL_ROOT = opt.val_dataroot
 
         # if opt.obj_path is not None:
         #    self.OBJ = opt.obj_path
