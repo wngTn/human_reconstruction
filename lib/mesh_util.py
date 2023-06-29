@@ -106,6 +106,7 @@ def reconstruction_3d(net, cuda, calib_tensor, extrinsic,
 
     # Finally we do marching cubes
     #try:
+    print("The highest probability for SDF was,", sdf.max())
     verts, faces, normals, values = measure._marching_cubes_lewiner.marching_cubes(sdf, threshold)
     # transform verts into world coordinate system
     verts = np.matmul(mat[:3, :3], verts.T) + mat[:3, 3:4]

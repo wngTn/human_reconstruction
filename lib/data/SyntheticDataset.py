@@ -529,6 +529,11 @@ class SyntheticDataset(Dataset):
             sample_data = self.visibility_sample(sample_data, res['depth'], res['calib'], res['mask'])
         res.update(sample_data)
 
+        # Warning dirty fix
+        if self.SMPL.endswith('_pred'):
+            mesh = trimesh.load(os.path.join(self.SMPL, f'smpl_{str(index).zfill(6)}.obj'))
+        else:
+            mesh = trimesh.load(os.path.join(self.SMPL, f'smplx_{str(index).zfill(6)}.obj'))
         mesh = trimesh.load(os.path.join(self.SMPL, f'smplx_{str(index).zfill(6)}.obj'))
         res['extrinsic'][0, :, :] = 0
         for i in range(3):

@@ -138,6 +138,18 @@ def train(opt):
                 save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
 
             iter_data_time = time.time()
+
+        if epoch % opt.freq_val == 0 and epoch != 0:
+            ply_save_path = Path(save_path) / f"{epoch}.ply"
+            r = res[0].cpu()
+            points = train_data['samples'][0].transpose(0, 1).cpu()
+            save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+
+            print("Performing Validation Now")
+            val_loss = validate(opt, netG, netN, val_data_loader, train_idx + (epoch * len(train_dataset)))
+            # log.add_scalar('val_loss', val_loss, epoch)
+            print('Current val loss: ', val_loss)
+
         
         # update learning rate
         lr = adjust_learning_rate(optimizerG, epoch, lr, [5, 10, 25], 0.1)
