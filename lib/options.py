@@ -38,9 +38,9 @@ def parse_config(argv=None):
     parser.add_argument('--loadSize', type=int, default=512, help='load size of input image')
     parser.add_argument('--b_min', nargs='+', default=[-3, -2, -3], type=float)
     parser.add_argument('--b_max', nargs='+', default=[3, 14, 3], type=float)
-    parser.add_argument('--smpl_faces', type=str, default='/media/data1/shaoruizhi/Multiview_Pair/lib/data/smplx_fine.obj')
+    parser.add_argument('--smpl_faces', type=str, default='')
 
-    parser.add_argument('--overfitting', action='store_true', help='overfitting on a single frame')
+    parser.add_argument('--overfitting', action='store_true', help='overfitting on a few frames')
 
     # Experiment related
     parser.add_argument('--num_views', type=int, default=1, help='How many views to use for multiview network.')

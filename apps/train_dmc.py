@@ -51,9 +51,6 @@ def train(opt):
 
     optimizerG = torch.optim.Adam(netG.parameters(), lr=opt.learning_rate)
     lr = opt.learning_rate
-
-    def set_train():
-        netG.train()
     
     if opt.load_netG_checkpoint_path is not None:
         print('loading for net G ...', opt.load_netG_checkpoint_path)
@@ -66,7 +63,7 @@ def train(opt):
     print("loaded finished!")
     
     train_dataset = SyntheticDataset(opt, phase='train', num_views=4)
-    val_dataset = SyntheticDataset(opt, phase='inference', num_views=4)
+    val_dataset = SyntheticDataset(opt, phase='val', num_views=4)
     test_dataset = SyntheticDataset(opt, phase='test', num_views=4)
         
     projection_mode = train_dataset.projection_mode
@@ -92,15 +89,11 @@ def train(opt):
 
     for epoch in range(start_epoch, opt.num_epoch):
         epoch_start_time = time.time()
-        set_train()
+        netG.train()
         iter_data_time = time.time()
-        # np.random.seed(int(time.time()))
-        # random.seed(int(time.time()))
-        # torch.manual_seed(int(time.time()))
-        train_bar = tqdm(enumerate(train_data_loader))
         save_path = Path(opt.results_path) / opt.name / str(epoch)
         save_path.mkdir(parents=True, exist_ok=True)
-        for train_idx, train_data in train_bar:
+        for train_idx, train_data in enumerate(train_data_loader):
             total_iteration += 1
             iter_start_time = time.time()
             # retrieve the data
@@ -126,11 +119,11 @@ def train(opt):
             log.add_scalar('loss', error.item(), total_iteration)
             if train_idx % opt.freq_plot == 0:
                 descrip = 'Name: {0} | Epoch: {1} | {2}/{3} | Err: {4:.06f} | LR: {5:.06f} | Sigma: {6:.02f} | dataT: {7:.05f} | netT: {8:.05f} | ETA: {9:02d}:{10:02d}'.format(
-                    opt.name, epoch, train_idx, len(train_data_loader), error.item(), lr, opt.sigma,
+                    opt.name, epoch, train_idx + 1, len(train_data_loader), error.item(), lr, opt.sigma,
                     iter_start_time - iter_data_time,
                     iter_net_time - iter_start_time, int(eta // 60),
                     int(eta - 60 * (eta // 60)))
-                train_bar.set_description(descrip)
+                print(descrip)
 
             if train_idx % opt.freq_save == 0:
                 torch.save(netG.state_dict(), '%s/%s/netG_latest' % (opt.checkpoints_path, opt.name))
@@ -145,13 +138,9 @@ def train(opt):
                 save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
 
             iter_data_time = time.time()
-
-        # val_loss = validate(netG, val_dataset)
-        # log.add_scalar('val_loss'. val_loss, epoch)
         
         # update learning rate
         lr = adjust_learning_rate(optimizerG, epoch, lr, [5, 10, 25], 0.1)
-        # train_dataset.clear_cache()
 
     log.close()
 

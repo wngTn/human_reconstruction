@@ -24,8 +24,7 @@ from lib.sample_util import *
 from lib.mesh_util import *
 from lib.train_util import find_border
 import lib.data.binvox_rw as binvox_rw
-import subprocess
-import OpenEXR
+# import OpenEXR
 
 log = logging.getLogger('trimesh')
 log.setLevel(40)
@@ -328,14 +327,15 @@ class SyntheticDataset(Dataset):
             render = Image.open(render_path).convert('RGB')
 
             def convert_exr2img(path):
-                exr_file = OpenEXR.InputFile(path)
-                dw = exr_file.header()['dataWindow']
-                size = (dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1)
-                channel_names = exr_file.header()['channels'].keys()
-                channels = [np.frombuffer(exr_file.channel(c), dtype=np.float32) for c in channel_names]
-                # The image data is stored in a flat array, so reshape it to the appropriate size
-                image = np.concatenate(channels).reshape((len(channels), size[1], size[0]))
-                return image
+                pass
+                # exr_file = OpenEXR.InputFile(path)
+                # dw = exr_file.header()['dataWindow']
+                # size = (dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1)
+                # channel_names = exr_file.header()['channels'].keys()
+                # channels = [np.frombuffer(exr_file.channel(c), dtype=np.float32) for c in channel_names]
+                # # The image data is stored in a flat array, so reshape it to the appropriate size
+                # image = np.concatenate(channels).reshape((len(channels), size[1], size[0]))
+                # return image
             
             if normal_path.endswith('.png'):
                 normal = Image.open(normal_path)
@@ -578,7 +578,6 @@ class SyntheticDataset(Dataset):
         mesh.apply_transform(rotation)
 
         transform[1, 3] = 0.5
-        mesh.apply_transform(transform)
         vox = creation.voxelize(mesh, pitch=1.0/128, bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]), method='binvox', exact=True)
         
         vox.fill()
