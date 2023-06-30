@@ -19,6 +19,7 @@ from lib.geometry import *
 from lib.sample_util import *
 from lib.mesh_util import *
 from lib.train_util import find_border
+import time
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 
@@ -198,8 +199,9 @@ class SyntheticDataset(Dataset):
         }
 
     def select_sampling_method(self, frame_id, person_id, b_min, b_max):
-        if self.cache_data.__contains__(person_id):
-            return self.cache_data[person_id]
+        person_key = f"{person_id}_{frame_id}"
+        if self.cache_data.__contains__(person_key):
+            return self.cache_data[person_key]
         # print(person_id, self.cache_data.__len__())
         root_dir = self.OBJ
         if self.is_train:
@@ -232,7 +234,7 @@ class SyntheticDataset(Dataset):
         feat_points = torch.zeros(1)
 
         self.cache_data_lock.acquire()
-        self.cache_data[person_id] = {
+        self.cache_data[person_key] = {
             'sample_points': sample_points,
             'surface_points': surface_points,
             'inside': inside,
@@ -240,7 +242,7 @@ class SyntheticDataset(Dataset):
         }
         self.cache_data_lock.release()
 
-        return self.cache_data[person_id]
+        return self.cache_data[person_key]
 
     def get_norm(self, frame_id, person_id):
         b_min = torch.zeros(3).float()
@@ -496,10 +498,12 @@ class SyntheticDataset(Dataset):
         norm_parameter = self.get_norm(frame_id, subject_id)
         res.update(norm_parameter)
 
+        start = time.time()
         sample_data = self.select_sampling_method(frame_id, subject_id, res['b_min'].numpy(), res['b_max'].numpy())
         if self.phase != 'inference':
             sample_data = self.visibility_sample(sample_data, res['depth'], res['calib'], res['mask'])
         res.update(sample_data)
+        print(f"Time for sampling: {time.time() - start}")
 
         # Warning dirty fix
         if self.SMPL.endswith('_pred'):
