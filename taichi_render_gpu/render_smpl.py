@@ -118,5 +118,5 @@ if __name__ == '__main__':
     parser.add_argument("--synthetic", action="store_true")
     args = parser.parse_args()
 
-    render_smpl_global_normal(args.dataroot, args.obj_path, args.faces_path, res, args.flip_y, args.flip_normal)
+    render_smpl_global_normal(args.dataroot, args.obj_path, args.faces_path, res, args.flip_normal)
     
