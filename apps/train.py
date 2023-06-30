@@ -23,6 +23,7 @@ from lib.sample_util import *
 from lib.train_util import *
 from lib.data import SyntheticDataset
 from lib.model import *
+from multiprocessing import Process, Manager, Lock
 
 def init_paths(opt):
     opt.exp_name = f"{datetime.now().strftime('%m_%d-%H_%M_%S')}_{str(opt.name).capitalize()}"
@@ -65,8 +66,8 @@ def train(opt):
         netN.load_state_dict(torch.load(opt.load_netN_checkpoint_path, map_location=device), strict=False)
     
     
-    train_dataset = SyntheticDataset(opt, phase='train')
-    val_dataset = SyntheticDataset(opt, phase='val')
+    train_dataset = SyntheticDataset(opt, cache_data=Manager().dict(), cache_data_lock=Lock(), phase='train')
+    val_dataset = SyntheticDataset(opt, cache_data=Manager().dict(), cache_data_lock=Lock(), phase='val')
         
     # create data loader
     train_data_loader = DataLoader(train_dataset,
@@ -164,6 +165,7 @@ def train(opt):
         
         # update learning rate
         lr = adjust_learning_rate(optimizerG, epoch, lr, [5, 10, 25], 0.1)
+        train_dataset.clear_cache()
 
     log.close()
 

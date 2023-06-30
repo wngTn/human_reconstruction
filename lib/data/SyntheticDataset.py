@@ -25,7 +25,7 @@ os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 
 
 class SyntheticDataset(Dataset):
-    def __init__(self, opt, phase='train'):
+    def __init__(self, opt, cache_data, cache_data_lock, phase='train'):
         self.opt = opt
         self.projection_mode = 'perspective'
         self.phase = phase
@@ -58,6 +58,9 @@ class SyntheticDataset(Dataset):
         self.subjects = self.opt.persons
         self.frames = self.opt.frames
 
+        self.cache_data = cache_data
+        self.cache_data_lock = cache_data_lock
+
         self.num_sample_inout = self.opt.num_sample_inout
 
         # PIL to tensor
@@ -75,6 +78,9 @@ class SyntheticDataset(Dataset):
 
     def __len__(self):
         return len(self.frames) * len(self.subjects)
+    
+    def clear_cache(self):
+        self.cache_data.clear()
 
     def visibility_sample(self, data, depth, calib, mask=None):
         surface_points = data['surface_points']
@@ -192,6 +198,9 @@ class SyntheticDataset(Dataset):
         }
 
     def select_sampling_method(self, frame_id, person_id, b_min, b_max):
+        if self.cache_data.__contains__(person_id):
+            return self.cache_data[person_id]
+        # print(person_id, self.cache_data.__len__())
         root_dir = self.OBJ
         if self.is_train:
             mesh = trimesh.load(os.path.join(root_dir, f"person_{person_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))
@@ -222,14 +231,16 @@ class SyntheticDataset(Dataset):
 
         feat_points = torch.zeros(1)
 
-        sampling_results = {
+        self.cache_data_lock.acquire()
+        self.cache_data[person_id] = {
             'sample_points': sample_points,
             'surface_points': surface_points,
             'inside': inside,
             'feat_points': feat_points
         }
+        self.cache_data_lock.release()
 
-        return sampling_results
+        return self.cache_data[person_id]
 
     def get_norm(self, frame_id, person_id):
         b_min = torch.zeros(3).float()
