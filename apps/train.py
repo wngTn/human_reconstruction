@@ -143,7 +143,7 @@ def train(opt):
                 print(f"Saving checkpoints at iteration: {current_iteration}")
                 torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_latest')
                 torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_it_{current_iteration}')
-                torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_latest' % (opt.checkpoints_path, opt.name))
+                torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_latest')
                 torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_it_{current_iteration}')
 
             if train_idx % opt.freq_save_ply == 0:
