@@ -32,15 +32,19 @@ def create_grid(resX, resY, resZ, b_min=np.array([0, 0, 0]), b_max=np.array([1, 
 def batch_eval(points, eval_func, num_samples=512 * 512 * 512):
     num_pts = points.shape[1]
     sdf = np.zeros(num_pts)
-
+    error_list = []
     num_batches = num_pts // num_samples
     for i in range(num_batches):
-        sdf[i * num_samples:i * num_samples + num_samples] = eval_func(
+        sdf_value, error = eval_func(
             points[:, i * num_samples:i * num_samples + num_samples])
+        sdf[i * num_samples:i * num_samples + num_samples] = sdf_value
+        error_list.append(error)
     if num_pts % num_samples:
-        sdf[num_batches * num_samples:] = eval_func(points[:, num_batches * num_samples:])
+        sdf_value, error = eval_func(points[:, num_batches * num_samples:])
+        sdf[num_batches * num_samples:] = sdf_value
+        error_list.append(error)
 
-    return sdf
+    return sdf, np.array(error_list).mean()
 
 
 def eval_grid(coords, eval_func, num_samples=512 * 512 * 512):
@@ -56,6 +60,7 @@ def eval_grid_octree(coords, eval_func,
     resolution = coords.shape[1:4]
 
     sdf = np.zeros(resolution)
+    error_list = []
 
     dirty = np.ones(resolution, dtype=bool)
     grid_mask = np.zeros(resolution, dtype=bool)
@@ -70,7 +75,8 @@ def eval_grid_octree(coords, eval_func,
         #print('step size:', reso, 'test sample size:', test_mask.sum())
         points = coords[:, test_mask]
 
-        sdf[test_mask] = batch_eval(points, eval_func, num_samples=num_samples)
+        sdf[test_mask], error = batch_eval(points, eval_func, num_samples=num_samples)
+        error_list.append(error)
         dirty[test_mask] = False
 
         # do interpolation
@@ -99,4 +105,4 @@ def eval_grid_octree(coords, eval_func,
                         dirty[x:x + reso, y:y + reso, z:z + reso] = False
         reso //= 2
 
-    return sdf.reshape(resolution)
+    return sdf.reshape(resolution), np.array(error_list).mean()

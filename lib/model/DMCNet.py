@@ -42,7 +42,7 @@ class DMCNet(BaseNet):
         self.name = 'dmcnet'
 
         self.opt = opt
-        self.num_views = self.opt.num_views
+        self.num_views = len(opt.cameras)
 
         self.image_filter = HGFilter(opt)
 
@@ -61,13 +61,13 @@ class DMCNet(BaseNet):
 
         self.surface_classifier = SurfaceClassifier(
             filter_channels=self.opt.mlp_dim,
-            num_views=self.opt.num_views,  # self.opt.num_views,
+            num_views=len(self.opt.cameras),  # self.opt.num_views,
             no_residual=self.opt.no_residual,
             last_op=nn.Sigmoid())
 
         self.fine_sc = SurfaceClassifier(
             filter_channels=self.opt.fine_mlp_dim,
-            num_views=self.opt.num_views,  # self.opt.num_views,
+            num_views=len(self.opt.cameras),  # self.opt.num_views,
             no_residual=self.opt.no_residual,
             last_op=nn.Sigmoid())
         

@@ -8,6 +8,8 @@ external/Self-Correction-Human-Parsing/mhp_extension/data/*
 external/Self-Correction-Human-Parsing/checkpoints/*
 external/Self-Correction-Human-Parsing/mhp_extension/pretrain_model/*
 
+outputs/*
+meetings/**/**/output
 binvox
 results/*
 checkpoints/*

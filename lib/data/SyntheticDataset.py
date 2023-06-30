@@ -8,12 +8,8 @@ import cv2
 import torch
 from PIL.ImageFilter import GaussianBlur, MinFilter
 import trimesh
-from trimesh.voxel import creation
-import logging
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 import math
-import time
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,53 +19,46 @@ from lib.geometry import *
 from lib.sample_util import *
 from lib.mesh_util import *
 from lib.train_util import find_border
-import lib.data.binvox_rw as binvox_rw
-# import OpenEXR
 
-log = logging.getLogger('trimesh')
-log.setLevel(40)
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+
 
 
 class SyntheticDataset(Dataset):
-    @staticmethod
-    def modify_commandline_options(parser, is_train):
-        return parser
-
-    def __init__(self, opt, phase='train', num_views=None):
+    def __init__(self, opt, phase='train'):
         self.opt = opt
         self.projection_mode = 'perspective'
         self.phase = phase
+        self.voxel_shape = (128, 128, 128)
+        self.is_train = (phase == 'train')
+
         # Path setup
-        # self.root = os.path.join("data", "Synthetic", "first_trial")
         self.root = opt.train_dataroot
         self.RENDER = os.path.join(self.root, 'RGB')
         self.PARAM = os.path.join(self.root, 'output_data.npz')
         self.OBJ = os.path.join(self.root, 'Obj')
+        self.SMPL = os.path.join(self.root, 'Obj')
         self.DEPTH = os.path.join(self.root, 'Depth')
         self.NORMAL = os.path.join(self.root, 'Normal')
         self.SMPL_NORMAL = os.path.join(self.root, 'smpl_pos')
         self.MASK = os.path.join(self.root, 'Segmentation')
         self.VAL_ROOT = opt.val_dataroot
 
-        # if opt.obj_path is not None:
-        #    self.OBJ = opt.obj_path
-        # if opt.smpl_path is not None:
-        #    self.SMPL = opt.smpl_path
-        self.SMPL = os.path.join(self.root, 'Obj')
+        if opt.obj_path is not None:
+           self.OBJ = os.path.join(self.root,opt.obj_path)
+        if opt.smpl_path is not None:
+           self.SMPL = os.path.join(self.root, opt.smpl_path)
 
         self.smpl_faces = readobj(opt.smpl_faces)['f']
 
-        self.is_train = (phase == 'train')
-        # self.phase = phase
         self.load_size = self.opt.loadSize
 
-        self.num_views = self.opt.num_views
-        if not (num_views is None):
-            self.num_views = num_views
+        self.cameras = self.opt.cameras
+        self.num_views = len(self.cameras)
+        self.subjects = self.opt.persons
+        self.frames = self.opt.frames
 
         self.num_sample_inout = self.opt.num_sample_inout
-
-        self.subjects = self.get_subjects()
 
         # PIL to tensor
         self.to_tensor = transforms.Compose([
@@ -84,11 +73,8 @@ class SyntheticDataset(Dataset):
                                    hue=opt.aug_hue)
         ])
 
-    def get_subjects(self):
-        return ["main_subject"]
-
     def __len__(self):
-        return 23
+        return len(self.frames) * len(self.subjects)
 
     def visibility_sample(self, data, depth, calib, mask=None):
         surface_points = data['surface_points']
@@ -205,10 +191,10 @@ class SyntheticDataset(Dataset):
             'feat_points': data['feat_points']
         }
 
-    def select_sampling_method(self, index, b_min, b_max):
+    def select_sampling_method(self, frame_id, person_id, b_min, b_max):
         root_dir = self.OBJ
-        if self.phase != 'inference':
-            mesh = trimesh.load(os.path.join(root_dir, f'smplx_{str(index).zfill(6)}.obj'))
+        if self.is_train:
+            mesh = trimesh.load(os.path.join(root_dir, f"person_{person_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))
             if self.opt.coarse_part:
                 radius_list = [self.opt.sigma, self.opt.sigma * 2, self.opt.sigma * 4]
             else:
@@ -245,13 +231,13 @@ class SyntheticDataset(Dataset):
 
         return sampling_results
 
-    def get_norm(self, frame_id):
+    def get_norm(self, frame_id, person_id):
         b_min = torch.zeros(3).float()
         b_max = torch.zeros(3).float()
         scale = torch.zeros(1).float()
         center = torch.zeros(3).float()
 
-        t3_mesh = readobj(os.path.join(self.OBJ, f'smplx_{str(frame_id).zfill(6)}.obj'))['vi'][:, :3]
+        t3_mesh = readobj(os.path.join(self.OBJ, f"person_{frame_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))['vi'][:, :3]
         b0 = np.min(t3_mesh, axis=0)
         b1 = np.max(t3_mesh, axis=0)
         center = torch.FloatTensor((b0 + b1) / 2)
@@ -274,6 +260,10 @@ class SyntheticDataset(Dataset):
             'center': center,
             'direction': normal
         }
+    
+    def pad_to_shape(self, array):
+        pad_shape = [(0, s - a) for a, s in zip(array.shape, self.voxel_shape)]
+        return np.pad(array, pad_shape, 'constant')
     
     def load_parameters(self, prefix_path):
         parameters = np.load(os.path.join(prefix_path, "output_data.npz"), allow_pickle=True)
@@ -300,7 +290,7 @@ class SyntheticDataset(Dataset):
 
         return intrinsics, world_to_cam_matrix, camera_to_world_matrix
     
-    def load_render_data(self, frame_id):
+    def load_render_data(self, frame_id, person_id):
 
         calib_list = []
         render_list = []
@@ -313,49 +303,27 @@ class SyntheticDataset(Dataset):
 
         all_cam_parameters = self.load_parameters(self.root)
 
-        for cam_id in range(self.num_views):
-            render_path = os.path.join(self.RENDER, f"r_{frame_id}_{cam_id}_rgb.png")
-            depth_path = os.path.join(self.DEPTH, f"r_{frame_id}_{cam_id}_depth_{str(frame_id).zfill(4)}.png")
-            normal_path = os.path.join(self.NORMAL, f"r_{frame_id}_{cam_id}_normal_{str(frame_id).zfill(4)}.png")
-            smpl_norm_path = os.path.join(self.SMPL_NORMAL, f'r_{frame_id}_{cam_id}_global_smpl.png')
-            mask_path = os.path.join(self.MASK, f"r_{frame_id}_{cam_id}_segmentation_{str(frame_id).zfill(4)}.png")
+        for cam_id in self.cameras:
+            render_path = os.path.join(self.RENDER, f"cam_{cam_id}", f"r_{frame_id}_{cam_id}_rgb.png")
+            depth_path = os.path.join(self.DEPTH, f"cam_{cam_id}", f"r_{frame_id}_{cam_id}_depth_{str(frame_id).zfill(4)}.exr")
+            normal_path = os.path.join(self.NORMAL, f"cam_{cam_id}", f"r_{frame_id}_{cam_id}_normal_{str(frame_id).zfill(4)}.exr")
+            smpl_norm_path = os.path.join(self.SMPL_NORMAL, f"person_{person_id}", f"cam_{cam_id}", f'r_{frame_id}_{cam_id}_global_smpl.png')
+            mask_path = os.path.join(self.MASK,  f"person_{person_id}", f"cam_{cam_id}", f"r_{frame_id}_{cam_id}_segmentation_{str(frame_id).zfill(4)}.png")
 
             intrinsic, extrinsic, _ = self.load_cam_parameters(all_cam_parameters, cam_id)
             extrinsic = extrinsic[:3, :]
 
             mask = Image.open(mask_path).convert('RGB')
             render = Image.open(render_path).convert('RGB')
-
-            def convert_exr2img(path):
-                pass
-                # exr_file = OpenEXR.InputFile(path)
-                # dw = exr_file.header()['dataWindow']
-                # size = (dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1)
-                # channel_names = exr_file.header()['channels'].keys()
-                # channels = [np.frombuffer(exr_file.channel(c), dtype=np.float32) for c in channel_names]
-                # # The image data is stored in a flat array, so reshape it to the appropriate size
-                # image = np.concatenate(channels).reshape((len(channels), size[1], size[0]))
-                # return image
-            
-            if normal_path.endswith('.png'):
-                normal = Image.open(normal_path)
-            elif normal_path.endswith('.exr'):
-                normal = convert_exr2img(normal_path) 
-                normal = Image.fromarray(np.transpose(normal, (1, 2, 0)).astype(np.uint8))
-            else:
-                raise ValueError('Unsupported format: {}'.format(normal_path))
-
-            if depth_path.endswith('.png'):
-                depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
-                depth = depth.astype(np.float32) / 1000.0
-                # depth = Image.fromarray(depth)
-                depth = Image.fromarray(depth.astype(np.uint8))
-            elif depth_path.endswith('.exr'):
-                depth = convert_exr2img(depth_path)
-                depth = Image.fromarray((np.transpose(depth, (1, 2, 0)) / 1000.0).astype(np.uint8))
-            else:
-                raise ValueError('Unsupported format: {}'.format(depth_path))
-
+            normal = cv2.imread(normal_path, cv2.IMREAD_UNCHANGED)
+            normal = cv2.cvtColor(normal, cv2.COLOR_BGR2RGB)
+            normal = (normal + 1) / 2.0
+            normal = (255 * normal).astype(np.uint8)
+            normal = Image.fromarray(normal, 'RGB')
+            depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+            depth = depth.astype(np.float32) / 1000.0
+            # depth = Image.fromarray(depth)
+            depth = Image.fromarray(depth.astype(np.uint8))
             smpl_norm = Image.open(smpl_norm_path)
 
             imgs_list = [render, depth, normal, mask, smpl_norm]
@@ -365,11 +333,7 @@ class SyntheticDataset(Dataset):
                 intrinsic[0, :] *= -1.0
                 intrinsic[0, 2] += self.load_size
 
-            if self.opt.infer:
-                # intrinsic[0, 2] += 10
-                if self.opt.infer_reverse:
-                    intrinsic[1, :] *= -1.0
-                    intrinsic[1, 2] += self.load_size
+            if not self.is_train:
                 if (not self.opt.no_correct):
                     fx, fy, cx, cy = intrinsic[0, 0], intrinsic[1, 1], intrinsic[0, 2], intrinsic[1, 2]
                     x_min, x_max, y_min, y_max = find_border(imgs_list[3])
@@ -386,9 +350,6 @@ class SyntheticDataset(Dataset):
                     cy = scale * (cy - y_min)
                     intrinsic[0, 0], intrinsic[1, 1], intrinsic[0, 2], intrinsic[1, 2] = fx, fy, cx, cy
                     depth = transforms.RandomVerticalFlip(p=1.0)(depth)
-            # else:
-                # intrinsic[1, :] *= -1.0
-                # intrinsic[1, 2] += self.load_size
 
             if self.is_train:
                 # Pad images
@@ -436,7 +397,7 @@ class SyntheticDataset(Dataset):
                     blur = GaussianBlur(np.random.uniform(0, self.opt.aug_blur))
                     render = render.filter(blur)
             else:
-                if self.opt.infer and (not self.opt.no_correct):
+                if not self.is_train and (not self.opt.no_correct):
                     for i, img in enumerate(imgs_list):
                         if i == 4:
                             fill_n = (128, 128, 128)
@@ -474,14 +435,14 @@ class SyntheticDataset(Dataset):
 
             mask_new = mask.filter(MinFilter(3))
             mask = torch.sum(torch.FloatTensor((np.array(mask).reshape((512, 512, -1)))), dim=2) / 255
-            mask[mask > 1] = 1.0
+            mask[mask > 0] = 1.0
             ero_mask = torch.FloatTensor(np.array(mask).reshape((512, 512, -1)))[:, :, 0] / 255
             render = self.to_tensor(render) * mask.reshape(1, 512, 512)
             normal = self.to_tensor(normal) * mask.reshape(1, 512, 512)
             smpl_norm = self.to_tensor(smpl_norm)
 
             mask = torch.sum(torch.FloatTensor((np.array(mask_new).reshape((512, 512, -1)))), dim=2) / 255
-            mask[mask > 1] = 1.0
+            mask[mask > 0] = 1.0
 
             render_list.append(render)
             calib_list.append(calib)
@@ -509,22 +470,22 @@ class SyntheticDataset(Dataset):
 
     def get_item(self, index):
         
-        subject_id = 0
+        subject_id = index % len(self.subjects)
+        frame_id = index // len(self.subjects)
 
-        subject = self.subjects[subject_id]
+        subject_id = self.subjects[subject_id]
         res = {
-            'name': subject,
-            'mesh_path': os.path.join(self.OBJ, f'smplx_{str(index).zfill(6)}.obj'),
+            'name': f"Person_{subject_id}",
+            'mesh_path': os.path.join(self.OBJ, f"person_{subject_id}", "combined", f'smplx_{str(index).zfill(6)}.obj'),
             'sid': subject_id,
         }
 
-
-        render_data = self.load_render_data(index)
+        render_data = self.load_render_data(frame_id, subject_id)
         res.update(render_data) 
-        norm_parameter = self.get_norm(index)
+        norm_parameter = self.get_norm(frame_id, subject_id)
         res.update(norm_parameter)
 
-        sample_data = self.select_sampling_method(index, res['b_min'].numpy(), res['b_max'].numpy())
+        sample_data = self.select_sampling_method(frame_id, subject_id, res['b_min'].numpy(), res['b_max'].numpy())
         if self.phase != 'inference':
             sample_data = self.visibility_sample(sample_data, res['depth'], res['calib'], res['mask'])
         res.update(sample_data)
@@ -533,8 +494,7 @@ class SyntheticDataset(Dataset):
         if self.SMPL.endswith('_pred'):
             mesh = trimesh.load(os.path.join(self.SMPL, f'smpl_{str(index).zfill(6)}.obj'))
         else:
-            mesh = trimesh.load(os.path.join(self.SMPL, f'smplx_{str(index).zfill(6)}.obj'))
-        mesh = trimesh.load(os.path.join(self.SMPL, f'smplx_{str(index).zfill(6)}.obj'))
+            mesh = trimesh.load(os.path.join(self.SMPL, f"person_{subject_id}", "smplx", f'smplx_{str(index).zfill(6)}.obj'))
         res['extrinsic'][0, :, :] = 0
         for i in range(3):
             res['extrinsic'][0, i, i] = 1
@@ -546,8 +506,6 @@ class SyntheticDataset(Dataset):
             translation[i, i] = res['scale'].numpy()
         translation[3, 3] = 1
         mesh.apply_transform(translation)
-        if self.opt.infer:
-            print('after: ', mesh.bounds)
 
         # center
         transform = np.zeros((4, 4))
@@ -555,10 +513,6 @@ class SyntheticDataset(Dataset):
             transform[i, i] = 1
         transform[1, 3] = -0.5
         mesh.apply_transform(transform)
-
-        # flip
-        # if self.opt.flip_smpl:
-        #     res['direction'] = -res['direction']
 
         # rotation
         direction = res['direction']
@@ -583,10 +537,15 @@ class SyntheticDataset(Dataset):
         mesh.apply_transform(rotation)
 
         transform[1, 3] = 0.5
-        vox = creation.voxelize(mesh, pitch=1.0/128, bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]), method='binvox', exact=True)
-        
+        mesh.apply_transform(transform)
+        bbox = mesh.bounds
+        bbox_size = np.max(bbox[1] - bbox[0])  # size of the bounding box
+        pitch = bbox_size / (128 - 1)  # size of each voxel
+        vox = mesh.voxelized(pitch=pitch)
         vox.fill()
-        res['vox'] = torch.FloatTensor(vox.matrix).unsqueeze(0)
+
+        voxel_grid = self.pad_to_shape(vox.matrix)
+        res['vox'] = torch.FloatTensor(voxel_grid).unsqueeze(0)
 
         if self.opt.debug_data:
             for num_view_i in range(self.num_views):
@@ -606,7 +565,7 @@ class SyntheticDataset(Dataset):
         return res
 
     def __getitem__(self, index):
-        return self.get_item(index + 1)
+        return self.get_item(index)
 
 
 # get options
