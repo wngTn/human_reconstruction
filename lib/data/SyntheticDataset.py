@@ -237,7 +237,7 @@ class SyntheticDataset(Dataset):
         scale = torch.zeros(1).float()
         center = torch.zeros(3).float()
 
-        t3_mesh = readobj(os.path.join(self.OBJ, f"person_{frame_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))['vi'][:, :3]
+        t3_mesh = readobj(os.path.join(self.OBJ, f"person_{person_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))['vi'][:, :3]
         b0 = np.min(t3_mesh, axis=0)
         b1 = np.max(t3_mesh, axis=0)
         center = torch.FloatTensor((b0 + b1) / 2)
