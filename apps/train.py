@@ -113,6 +113,7 @@ def train(opt):
             del net_normal
             
             # with autocast():
+            netG.training = True
             res, error = netG.forward(train_data)
             optimizerG.zero_grad()
             error.backward()
@@ -156,19 +157,19 @@ def train(opt):
                 torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_latest')
                 torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_it_{current_iteration}')
 
-            if train_idx % opt.freq_save_ply == 0:
-                ply_save_path = os.path.join(opt.train_results_path, f"{epoch}_{current_iteration}.ply")
-                r = res[0].cpu()
-                points = train_data['samples'][0].transpose(0, 1).cpu()
-                save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
-                print(f"Saving train ply in {ply_save_path}")
-                del r
-                del res
-                del points
+            # if train_idx % opt.freq_save_ply == 0:
+            #     ply_save_path = os.path.join(opt.train_results_path, f"{epoch}_{current_iteration}.ply")
+            #     r = res[0].cpu()
+            #     points = train_data['samples'][0].transpose(0, 1).cpu()
+            #     save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+            #     print(f"Saving train ply in {ply_save_path}")
+            #     del r
+            #     del res
+            #     del points
 
             iter_data_time = time.time()
 
-        if epoch % opt.freq_val == 0:
+        if epoch != 0 and epoch % opt.freq_val == 0:
             print("Performing Validation Now")
             val_loss = validate(opt, netG, netN, val_data_loader, epoch)
             log.add_scalar('val_loss', val_loss, epoch)
@@ -188,9 +189,13 @@ def validate(opt, netG, netN, val_data_loader, epoch):
     test_netN = netN.module
     test_netG.eval()
     test_netN.eval()
-    mean_error = 0
+    # mean_error = 0
+
     for i, val_data in tqdm(enumerate(val_data_loader), total=len(val_data_loader)):
-        # val_save_path = os.path.join(opt.val_results_path, f"{epoch}_{i}.obj")
+        val_save_path = os.path.join(opt.val_results_path, f"{epoch}_{i+1}.obj")
+
+        if i >= 4:
+            break
 
         for key in val_data:
             if torch.is_tensor(val_data[key]):
@@ -205,24 +210,43 @@ def validate(opt, netG, netN, val_data_loader, epoch):
         del net_normal
 
         with torch.no_grad():
-            res, error = test_netG.forward(val_data)
-    
-            # error = gen_validation(opt, test_netG, device, val_data, epoch, i, threshold=opt.mc_threshold, use_octree=True)
-        error = error.item()
-        # print(type(error), error)
-        mean_error = (mean_error * i + error) / (i + 1)
 
-        if i % opt.freq_save_ply == 0:
-            ply_save_path = os.path.join(opt.val_results_path, f"{epoch}_{i}.ply")
-            r = res[0].cpu()
-            points = val_data['samples'][0].transpose(0, 1).cpu()
-            del val_data
-            save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
-            print(f"Saving val ply in {ply_save_path}")
-            del r
-            del res
-            del points
-    return mean_error
+            if opt.val_type == 'mse':
+                res, error = test_netG.forward(val_data)
+                error = error.item()
+                # print(type(error), error)
+                mean_error = (mean_error * i + error) / (i + 1)
+                errot = mean_error
+            else:
+                print('Generating mesh (inference) ... ')
+                test_netG.training = False
+                gen_validation(opt, test_netG, device, val_data, epoch, i, threshold=0.5, use_octree=True)
+
+                # val p2s error:
+                num_samples = 10000
+                src_mesh = trimesh.load(val_save_path)
+                # tgt_mesh = trimesh.load(os.path.join(val_data['OBJ'], f"person_{person_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))
+                # tgt_mesh = trimesh.load(os.path.join(val_data['OBJ'], f"person_0", "combined", f'smplx_{str(i+1).zfill(6)}.obj'))
+                tgt_mesh = trimesh.load(val_data['mesh_path'][0])
+                src_surf_pts, _ = trimesh.sample.sample_surface(src_mesh, num_samples)
+                _, src_tgt_dist, _ = trimesh.proximity.closest_point(tgt_mesh, src_surf_pts)
+                src_tgt_dist[np.isnan(src_tgt_dist)] = 0
+                src_tgt_dist[~np.isfinite(src_tgt_dist)] = 0
+                p2s_error = src_tgt_dist.mean()
+                error = p2s_error
+                print('p2s error = ', p2s_error)
+
+        # if i % opt.freq_save_ply == 0:
+        #     ply_save_path = os.path.join(opt.val_results_path, f"{epoch}_{i}.ply")
+        #     r = res[0].cpu()
+        #     points = val_data['samples'][0].transpose(0, 1).cpu()
+        #     del val_data
+        #     save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+        #     print(f"Saving val ply in {ply_save_path}")
+        #     del r
+        #     del res
+        #     del points
+    return error
     
 
 

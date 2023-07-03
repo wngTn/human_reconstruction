@@ -286,27 +286,21 @@ class DMCNet(BaseNet):
         '''
         return self.im_feat_list[-1]
 
-    def get_error(self, valgtlabels = None):
+    def get_error(self):
         '''
         Hourglass has its own intermediate supervision scheme
         '''
         error = 0
         error_fine = 0
         error_sg = 0
-        if valgtlabels != None:
-            # raise TypeError('valgtlabels should not be None')
-            labels = valgtlabels
-            print(f"Calculating with {int(labels.shape[2])} labels")
-        else:
-            labels = self.labels
 
         if self.opt.fine_part:
             for preds in self.fine_preds_list:
-                error_fine += self.error_func(preds, labels)
+                error_fine += self.error_func(preds, self.labels)
             error_fine /= len(self.fine_preds_list)
         if self.opt.coarse_part:
             for preds in self.intermediate_preds_list:
-                error += self.error_func(preds, labels)
+                error += self.error_func(preds, self.labels)
             error /= len(self.intermediate_preds_list)
         if self.opt.preserve_single:
             for preds in self.sg_preds_list:
@@ -324,7 +318,7 @@ class DMCNet(BaseNet):
         smpl_normal = data["smpl_normal"]
         points, calibs, extrinsic = data["samples"], data["calib"], data["extrinsic"]
 
-        # labels = data['labels']
+        labels = data['labels']
         self.mask_init(data["mask"], data["ero_mask"])
         self.norm_init(data["scale"], data["center"])
 
@@ -346,12 +340,12 @@ class DMCNet(BaseNet):
         # point query
         # len = labels.shape[2] if labels is not None else 0
         # print(f"Querying for phase: {data['phase']} with {int(len)} labels")
-        self.query(points=points, calibs=calibs, extrinsic=extrinsic)
+        self.query(points=points, calibs=calibs, extrinsic=extrinsic, labels=labels)
 
         # get the prediction
         res = self.get_preds()
 
         # get the error
-        error = self.get_error(labels=None)
+        error = self.get_error()
 
         return res, error

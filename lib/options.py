@@ -61,6 +61,7 @@ def parse_config(argv=None):
     parser.add_argument('--num_epoch', type=int, default=1000, help='num epoch to train')
 
     parser.add_argument('--val_step', type=int, default=50, help='num of train iterations for validation')
+    parser.add_argument('--val_type', type=str, default='mse', help='use mse or p2s as val error, if the latter, mesh will be generated')
 
     
     parser.add_argument('--freq_plot', type=int, default=10, help='freqency of the print')

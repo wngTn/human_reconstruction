@@ -20,12 +20,12 @@ def gen_validation(opt, net, device, data, epoch, iteration, use_octree=True, th
     normal_tensor = data['normal'].squeeze(0)
     scale, center = data['scale'], data['center']
     mask, ero_mask = data['mask'], data['ero_mask']
-    labels = data['labels']
-    pts = data['samples']
+    # labels = data['labels']
+    # pts = data['samples']
 
-    net.mask_init(mask, ero_mask)
+    net.mask_init(mask, ero_mask)   # --> unsqueeze(0)
     net.norm_init(scale, center)
-    net.smpl_init(smpl_normal)
+    net.smpl_init(smpl_normal)      # --> unsqueeze(0)
     
     net.filter2d(torch.cat([image_tensor.unsqueeze(0), smpl_normal], dim=2))
     if opt.fine_part:
@@ -39,34 +39,37 @@ def gen_validation(opt, net, device, data, epoch, iteration, use_octree=True, th
     b_min = data['b_min']
     b_max = data['b_max']
 
-    # save_img_path = os.path.join(opt.val_results_path, f"{epoch}_{iteration}.png") # save_path[:-4] + '.png'
-    # save_img_list = []
-    # for v in range(image_tensor.shape[0]):
-    #     save_img = (np.transpose(image_tensor[v].detach().cpu().numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0
-    #     save_smpl = (np.transpose(save_smpl_normal[0][v].detach().cpu().numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0
-    #     save_img_list.append(save_img / 2 + save_smpl / 2)
-    # for v in range(normal_tensor.shape[0]):
-    #     save_nm = normal_tensor[v]
-    #     save_nm = F.interpolate(save_nm.unsqueeze(0), size=[512, 512], mode='bilinear')[0]
-    #     save_nm = (np.transpose(save_nm.detach().cpu().numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0
-    #     save_img_list.append(save_nm)
-    # save_img = np.concatenate(save_img_list, axis=1)
-    # Image.fromarray(np.uint8(save_img[:,:,::-1])).save(save_img_path)
+    save_img_path = os.path.join(opt.val_results_path, f"{epoch}_{iteration}.png") # save_path[:-4] + '.png'
+    save_img_list = []
+    for v in range(image_tensor.shape[0]):
+        save_img = (np.transpose(image_tensor[v].detach().cpu().numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0
+        save_smpl = (np.transpose(save_smpl_normal[0][v].detach().cpu().numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0
+        save_img_list.append(save_img / 2 + save_smpl / 2)
+    for v in range(normal_tensor.shape[0]):
+        save_nm = normal_tensor[v]
+        save_nm = F.interpolate(save_nm.unsqueeze(0), size=[512, 512], mode='bilinear')[0]
+        save_nm = (np.transpose(save_nm.detach().cpu().numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0
+        save_img_list.append(save_nm)
+    save_img = np.concatenate(save_img_list, axis=1)
+    Image.fromarray(np.uint8(save_img[:,:,::-1])).save(save_img_path)
 
     try:
         # verts, faces, _, _, error = reconstruction_3d(
             # net, device, calib_tensor.unsqueeze(0), extrinsic, opt.resolution, b_min, b_max, use_octree=use_octree, threshold=threshold)
         torch.cuda.empty_cache()
-        num_points_for_val = data['samples'].shape[2]
-        verts, faces, _, _, error = reconstruction_3d(net, device, calib_tensor, extrinsic, opt.resolution, np.array(b_min.squeeze(0).cpu()), np.array(b_max.squeeze(0).cpu()), 
-                                                      pts, labels, use_octree=use_octree, num_samples = num_points_for_val, threshold=threshold)
-        # verts_tensor = torch.from_numpy(verts.T).unsqueeze(0).to(device=device).float()
-        # xyz_tensor = net.projection(verts_tensor, calib_tensor[:1])
-        # uv = xyz_tensor[:, :2, :]
-        # color = index(image_tensor[:1], uv).detach().cpu().numpy()[0].T
-        # color = color * 0.5 + 0.5
-        # save_obj_mesh_with_color(os.path.join(opt.val_results_path, f"{epoch}_{iteration}.obj"), verts, faces, color)
-        return error
+        # num_points_for_val = data['samples'].shape[2]
+        # verts, faces, _, _ = reconstruction_3d(net, device, calib_tensor, extrinsic, opt.resolution, np.array(b_min.squeeze(0).cpu()), np.array(b_max.squeeze(0).cpu()), 
+                                                    #   pts, labels, use_octree=use_octree, num_samples = num_points_for_val, threshold=threshold)
+        verts, faces, _, _ = reconstruction_3d(
+            net, device, calib_tensor, extrinsic, opt.resolution, np.array(b_min.squeeze(0).cpu()), np.array(b_max.squeeze(0).cpu()), use_octree=use_octree, threshold=threshold)
+        
+        verts_tensor = torch.from_numpy(verts.T).unsqueeze(0).to(device=device).float()
+        xyz_tensor = net.projection(verts_tensor, calib_tensor.squeeze(0)[:1])
+        uv = xyz_tensor[:, :2, :]
+        color = index(image_tensor[:1], uv).detach().cpu().numpy()[0].T
+        color = color * 0.5 + 0.5
+        save_obj_mesh_with_color(os.path.join(opt.val_results_path, f"{epoch}_{iteration+1}.obj"), verts, faces, color)
+        print('Saved to ' + os.path.join(opt.val_results_path, f"{epoch}_{iteration+1}.obj"))
     except Exception as e:
         print("Yo, something went wrong", e)
 
