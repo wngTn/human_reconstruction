@@ -8,6 +8,7 @@ import cv2
 import torch
 from PIL.ImageFilter import GaussianBlur, MinFilter
 import trimesh
+from trimesh.voxel import creation
 from tqdm import tqdm
 import math
 import sys
@@ -560,10 +561,11 @@ class SyntheticDataset(Dataset):
 
         transform[1, 3] = 0.5
         mesh.apply_transform(transform)
-        bbox = mesh.bounds
-        bbox_size = np.max(bbox[1] - bbox[0])  # size of the bounding box
-        pitch = bbox_size / (128 - 1)  # size of each voxel
-        vox = mesh.voxelized(pitch=pitch)
+        # bbox = mesh.bounds
+        # bbox_size = np.max(bbox[1] - bbox[0])  # size of the bounding box
+        # pitch = bbox_size / (128 - 1)  # size of each voxel
+        # vox = mesh.voxelized(pitch=pitch)
+        vox = creation.voxelize(mesh, pitch=1.0/128, bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]), method='binvox', exact=True)
         vox.fill()
 
         voxel_grid = self.pad_to_shape(vox.matrix)

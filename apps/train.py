@@ -189,7 +189,7 @@ def validate(opt, netG, netN, val_data_loader, epoch):
     test_netN = netN.module
     test_netG.eval()
     test_netN.eval()
-    # mean_error = 0
+    mean_error = 0
 
     for i, val_data in tqdm(enumerate(val_data_loader), total=len(val_data_loader)):
         val_save_path = os.path.join(opt.val_results_path, f"{epoch}_{i+1}.obj")
@@ -216,7 +216,7 @@ def validate(opt, netG, netN, val_data_loader, epoch):
                 error = error.item()
                 # print(type(error), error)
                 mean_error = (mean_error * i + error) / (i + 1)
-                errot = mean_error
+                error = mean_error
             else:
                 print('Generating mesh (inference) ... ')
                 test_netG.training = False

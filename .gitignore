@@ -11,6 +11,7 @@ external/Self-Correction-Human-Parsing/mhp_extension/pretrain_model/*
 logs/*
 val_vis/*
 meetings/**/*.png
+outputs/*
 
 binvox
 results/*
