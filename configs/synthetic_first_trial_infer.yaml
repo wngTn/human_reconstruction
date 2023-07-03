@@ -4,7 +4,8 @@ gpu_ids: 0
 num_threads: 1
 batch_size: 1
 infer: True
-infer_reverse: True
+
+coarse_part: True
 
 # data 
 num_views: 4
@@ -18,15 +19,21 @@ mlp_dim: [323, 1024, 512, 256, 128, 1]
 fine_mlp_dim: [355, 512, 256, 128, 1]
 
 # path
-load_netG_checkpoint_path: T:/at3dcv_project/checkpoints/suibianshishi2/netG_latest
-# load_netG_checkpoint_path: T:/at3dcv_project/checkpoints/sex_1_overfit/sex_1_overfit/netG_latest
-load_netN_checkpoint_path: T:/at3dcv_project/checkpoints/demo/netN_latest
+load_netG_checkpoint_path: checkpoints/synthetic_first_trial_gt/netG_latest
+load_netN_checkpoint_path: checkpoints/demo/netN_latest
 
 # smpl
 smpl_faces:  lib/data/smpl_open3d.obj
 # lib/data/smplx_multi.obj
 # smplx_correction.obj
 # smplx_fine.obj      ### -> error: indexes dont match
+
+train_dataroot: data/Synthetic/first_trial
+val_dataroot: data/Synthetic/first_trial
+
+# smpl
+smpl_path: Obj
+obj_path: Obj 
 
 # marching cube
 resolution: 512

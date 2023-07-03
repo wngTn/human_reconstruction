@@ -42,7 +42,7 @@ class DMCNet(BaseNet):
         self.name = 'dmcnet'
 
         self.opt = opt
-        self.num_views = self.opt.num_views
+        self.num_views = len(opt.cameras)
 
         self.image_filter = HGFilter(opt)
 
@@ -61,13 +61,13 @@ class DMCNet(BaseNet):
 
         self.surface_classifier = SurfaceClassifier(
             filter_channels=self.opt.mlp_dim,
-            num_views=self.opt.num_views,  # self.opt.num_views,
+            num_views=len(self.opt.cameras),  # self.opt.num_views,
             no_residual=self.opt.no_residual,
             last_op=nn.Sigmoid())
 
         self.fine_sc = SurfaceClassifier(
             filter_channels=self.opt.fine_mlp_dim,
-            num_views=self.opt.num_views,  # self.opt.num_views,
+            num_views=len(self.opt.cameras),  # self.opt.num_views,
             no_residual=self.opt.no_residual,
             last_op=nn.Sigmoid())
         
@@ -241,6 +241,7 @@ class DMCNet(BaseNet):
                 point_local_feat = torch.cat(point_local_feat_list, 1)
 
                 # out of image plane is always set to 0
+                torch.cuda.empty_cache()
                 pred = self.surface_classifier(point_local_feat)
                 self.intermediate_preds_list.append(pred)
                 
@@ -285,20 +286,27 @@ class DMCNet(BaseNet):
         '''
         return self.im_feat_list[-1]
 
-    def get_error(self):
+    def get_error(self, valgtlabels = None):
         '''
         Hourglass has its own intermediate supervision scheme
         '''
         error = 0
         error_fine = 0
         error_sg = 0
+        if valgtlabels != None:
+            # raise TypeError('valgtlabels should not be None')
+            labels = valgtlabels
+            print(f"Calculating with {int(labels.shape[2])} labels")
+        else:
+            labels = self.labels
+
         if self.opt.fine_part:
             for preds in self.fine_preds_list:
-                error_fine += self.error_func(preds, self.labels)
+                error_fine += self.error_func(preds, labels)
             error_fine /= len(self.fine_preds_list)
         if self.opt.coarse_part:
             for preds in self.intermediate_preds_list:
-                error += self.error_func(preds, self.labels)
+                error += self.error_func(preds, labels)
             error /= len(self.intermediate_preds_list)
         if self.opt.preserve_single:
             for preds in self.sg_preds_list:
@@ -315,7 +323,8 @@ class DMCNet(BaseNet):
         vox = data["vox"]
         smpl_normal = data["smpl_normal"]
         points, calibs, extrinsic = data["samples"], data["calib"], data["extrinsic"]
-        labels = data["labels"]
+
+        # labels = data['labels']
         self.mask_init(data["mask"], data["ero_mask"])
         self.norm_init(data["scale"], data["center"])
 
@@ -335,12 +344,14 @@ class DMCNet(BaseNet):
             self.filter2d(images)
 
         # point query
-        self.query(points=points, calibs=calibs, extrinsic=extrinsic, labels=labels)
+        # len = labels.shape[2] if labels is not None else 0
+        # print(f"Querying for phase: {data['phase']} with {int(len)} labels")
+        self.query(points=points, calibs=calibs, extrinsic=extrinsic)
 
         # get the prediction
         res = self.get_preds()
 
         # get the error
-        error = self.get_error()
+        error = self.get_error(labels=None)
 
         return res, error

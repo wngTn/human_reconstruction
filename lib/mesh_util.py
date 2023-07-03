@@ -4,10 +4,71 @@ import torch
 from PIL import Image
 import torch.nn.functional as F
 import trimesh
+import os
 
 from .sdf import create_grid, eval_grid_octree, eval_grid
 from .net_util import reshape_sample_tensor
 from .geometry import index
+
+def gen_validation(opt, net, device, data, epoch, iteration, use_octree=True, threshold=0.5):
+    image_tensor = data['image'].squeeze(0)
+    calib_tensor = data['calib']
+    extrinsic = data['extrinsic']
+    vox_tensor = data['vox']
+    smpl_normal = data['smpl_normal']
+    save_smpl_normal = smpl_normal.clone()
+    normal_tensor = data['normal'].squeeze(0)
+    scale, center = data['scale'], data['center']
+    mask, ero_mask = data['mask'], data['ero_mask']
+    labels = data['labels']
+    pts = data['samples']
+
+    net.mask_init(mask, ero_mask)
+    net.norm_init(scale, center)
+    net.smpl_init(smpl_normal)
+    
+    net.filter2d(torch.cat([image_tensor.unsqueeze(0), smpl_normal], dim=2))
+    if opt.fine_part:
+        if normal_tensor.shape[2] == 1024:
+            print('1024')
+            smpl_normal = torch.nn.Upsample(size=[1024, 1024], mode='bilinear')(smpl_normal.squeeze(0)).unsqueeze(0)
+        net.filter_normal(torch.cat([normal_tensor.unsqueeze(0), smpl_normal], dim=2))
+    
+    net.filter3d(vox_tensor)
+
+    b_min = data['b_min']
+    b_max = data['b_max']
+
+    # save_img_path = os.path.join(opt.val_results_path, f"{epoch}_{iteration}.png") # save_path[:-4] + '.png'
+    # save_img_list = []
+    # for v in range(image_tensor.shape[0]):
+    #     save_img = (np.transpose(image_tensor[v].detach().cpu().numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0
+    #     save_smpl = (np.transpose(save_smpl_normal[0][v].detach().cpu().numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0
+    #     save_img_list.append(save_img / 2 + save_smpl / 2)
+    # for v in range(normal_tensor.shape[0]):
+    #     save_nm = normal_tensor[v]
+    #     save_nm = F.interpolate(save_nm.unsqueeze(0), size=[512, 512], mode='bilinear')[0]
+    #     save_nm = (np.transpose(save_nm.detach().cpu().numpy(), (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0
+    #     save_img_list.append(save_nm)
+    # save_img = np.concatenate(save_img_list, axis=1)
+    # Image.fromarray(np.uint8(save_img[:,:,::-1])).save(save_img_path)
+
+    try:
+        # verts, faces, _, _, error = reconstruction_3d(
+            # net, device, calib_tensor.unsqueeze(0), extrinsic, opt.resolution, b_min, b_max, use_octree=use_octree, threshold=threshold)
+        torch.cuda.empty_cache()
+        num_points_for_val = data['samples'].shape[2]
+        verts, faces, _, _, error = reconstruction_3d(net, device, calib_tensor, extrinsic, opt.resolution, np.array(b_min.squeeze(0).cpu()), np.array(b_max.squeeze(0).cpu()), 
+                                                      pts, labels, use_octree=use_octree, num_samples = num_points_for_val, threshold=threshold)
+        # verts_tensor = torch.from_numpy(verts.T).unsqueeze(0).to(device=device).float()
+        # xyz_tensor = net.projection(verts_tensor, calib_tensor[:1])
+        # uv = xyz_tensor[:, :2, :]
+        # color = index(image_tensor[:1], uv).detach().cpu().numpy()[0].T
+        # color = color * 0.5 + 0.5
+        # save_obj_mesh_with_color(os.path.join(opt.val_results_path, f"{epoch}_{iteration}.obj"), verts, faces, color)
+        return error
+    except Exception as e:
+        print("Yo, something went wrong", e)
 
 
 def gen_mesh_dmc(opt, net, cuda, data, save_path, use_octree=True, threshold=0.5):
@@ -106,14 +167,12 @@ def reconstruction_3d(net, cuda, calib_tensor, extrinsic,
 
     # Finally we do marching cubes
     #try:
+    print("The highest probability for SDF was,", sdf.max())
     verts, faces, normals, values = measure._marching_cubes_lewiner.marching_cubes(sdf, threshold)
     # transform verts into world coordinate system
     verts = np.matmul(mat[:3, :3], verts.T) + mat[:3, 3:4]
     verts = verts.T
     return verts, faces, normals, values
-    #except:
-    #    print('error cannot marching cubes')
-    #    return -1
 
 def save_obj_mesh(mesh_path, verts, faces):
     file = open(mesh_path, 'w')
