@@ -310,6 +310,9 @@ class SyntheticDataset(Dataset):
 
         return intrinsics, world_to_cam_matrix, camera_to_world_matrix
     
+    def normalize_image(self, image):
+        return (image - np.min(image)) / (np.max(image) - np.min(image))
+    
     def load_render_data(self, frame_id, person_id):
 
         calib_list = []
@@ -337,13 +340,11 @@ class SyntheticDataset(Dataset):
             render = Image.open(render_path).convert('RGB')
             normal = cv2.imread(normal_path, cv2.IMREAD_UNCHANGED)
             normal = cv2.cvtColor(normal, cv2.COLOR_BGR2RGB)
-            normal = (normal + 1) / 2.0
-            normal = (255 * normal).astype(np.uint8)
+            normal = (self.normalize_image(normal) * 255 ).astype(np.uint8)
             normal = Image.fromarray(normal, 'RGB')
             depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
-            depth = depth.astype(np.float32) / 1000.0
-            # depth = Image.fromarray(depth)
-            depth = Image.fromarray(depth.astype(np.uint8))
+            depth = (self.normalize_image(depth) * 255 ).astype(np.uint8)
+            depth = Image.fromarray(depth)
             smpl_norm = Image.open(smpl_norm_path)
 
             imgs_list = [render, depth, normal, mask, smpl_norm]
