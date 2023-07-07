@@ -4,7 +4,6 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
 from pathlib import Path
 import time
 import json
@@ -14,33 +13,41 @@ import random
 import torch
 from torch.utils.data import DataLoader
 from torch.nn import DataParallel
-from tqdm import tqdm
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-import matplotlib.pyplot as plt
+from datetime import datetime
 
 from lib.options import parse_config
-from lib.mesh_util import *
+from lib.mesh_util import gen_validation
 from lib.sample_util import *
 from lib.train_util import *
 from lib.data import SyntheticDataset
 from lib.model import *
-from apps import evaluation
+from multiprocessing import Process, Manager, Lock
 
-# get options
-opt = parse_config()
+from torch.cuda.amp import autocast as autocast
 
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+def init_paths(opt):
+    opt.exp_name = f"{datetime.now().strftime('%m_%d-%H_%M_%S')}_{str(opt.name).capitalize()}"
+    opt.checkpoints_path = f"outputs/{opt.exp_name}/checkpoints"
+    opt.train_results_path = f"outputs/{opt.exp_name}/train_results"
+    opt.val_results_path = f"outputs/{opt.exp_name}/val_results"
+    os.makedirs(opt.checkpoints_path, exist_ok=True)
+    os.makedirs(opt.train_results_path, exist_ok=True)
+    os.makedirs(opt.val_results_path, exist_ok=True)
+    with open(f"outputs/{opt.exp_name}/configs.json", "w") as f:
+        args_dict = vars(opt)
+        json.dump(args_dict, f, indent=4)
+
 
 def train(opt):
     # np.random.seed(int(time.time()))
     # random.seed(int(time.time()))
     # torch.manual_seed(int(time.time()))
-    log = SummaryWriter(opt.log_path)
-    total_iteration = 0
+    log = SummaryWriter(os.path.join("outputs", opt.exp_name, "logs"))
     netG = DMCNet(opt, projection_mode='perspective').to(device)
     netN = NormalNet().to(device)
-    print('Using Network: ', netG.name, netN.name)
+    
     if device.type == 'cuda':
         gpu_ids = [int(i) for i in opt.gpu_ids.split(',')]
         netG = DataParallel(netG, device_ids=gpu_ids)
@@ -51,9 +58,6 @@ def train(opt):
 
     optimizerG = torch.optim.Adam(netG.parameters(), lr=opt.learning_rate)
     lr = opt.learning_rate
-
-    def set_train():
-        netG.train()
     
     if opt.load_netG_checkpoint_path is not None:
         print('loading for net G ...', opt.load_netG_checkpoint_path)
@@ -63,14 +67,10 @@ def train(opt):
         print('loading for net N ...', opt.load_netN_checkpoint_path)
         netN.load_state_dict(torch.load(opt.load_netN_checkpoint_path, map_location=device), strict=False)
     
-    print("loaded finished!")
     
-    train_dataset = SyntheticDataset(opt, phase='train', num_views=4)
-    val_dataset = SyntheticDataset(opt, phase='val', num_views=4)
-    # test_dataset = SyntheticDataset(opt, phase='test', num_views=4)
+    train_dataset = SyntheticDataset(opt, cache_data=Manager().dict(), cache_data_lock=Lock(), phase='train')
+    val_dataset = SyntheticDataset(opt, cache_data=Manager().dict(), cache_data_lock=Lock(), phase='val')
         
-    projection_mode = train_dataset.projection_mode
-    print('projection_mode:', projection_mode)
     # create data loader
     train_data_loader = DataLoader(train_dataset,
                                    batch_size=opt.batch_size, shuffle=not opt.serial_batches,
@@ -78,36 +78,25 @@ def train(opt):
     print('train data size: ', len(train_data_loader))
 
     val_data_loader = DataLoader(val_dataset,
-                                    batch_size=1, shuffle=False,
-                                    num_workers=1, pin_memory=opt.pin_memory)
+                                    batch_size=opt.batch_size, shuffle=not opt.serial_batches,
+                                    num_workers=opt.num_threads, pin_memory=opt.pin_memory)
     print('val data size: ', len(val_data_loader))
 
-
-    os.makedirs(opt.checkpoints_path, exist_ok=True)
-    os.makedirs(opt.results_path, exist_ok=True)
-    os.makedirs('%s/%s' % (opt.checkpoints_path, opt.name), exist_ok=True)
-    os.makedirs('%s/%s' % (opt.results_path, opt.name), exist_ok=True)
-
-    opt_log = os.path.join(opt.results_path, opt.name, 'opt.json')
-    with open(opt_log, 'w') as outfile:
-        outfile.write(json.dumps(vars(opt), indent=2))
-
     # training
-    start_epoch = 0
     print("start training......")
 
-    for epoch in range(start_epoch, opt.num_epoch):
-        epoch_start_time = time.time()
-        set_train()
+    current_iteration = 0
+
+    # Define a list to store the last 10 error values
+    errors = []
+    total_iteration = int(opt.num_epoch * (len(train_data_loader) // opt.batch_size))
+
+    for epoch in range(opt.num_epoch):
+        netG.train()
         iter_data_time = time.time()
-        # np.random.seed(int(time.time()))
-        # random.seed(int(time.time()))
-        # torch.manual_seed(int(time.time()))
-        train_bar = tqdm(enumerate(train_data_loader))
-        save_path = Path(opt.results_path) / opt.name / str(epoch)
-        save_path.mkdir(parents=True, exist_ok=True)
-        for train_idx, train_data in train_bar:
-            total_iteration += 1
+        
+        for train_idx, train_data in tqdm(enumerate(train_data_loader), total = len(train_data_loader)):
+            current_iteration += 1
             iter_start_time = time.time()
             # retrieve the data
             for key in train_data:
@@ -120,48 +109,78 @@ def train(opt):
                 net_normal = net_normal * train_data['mask']
                
             train_data['normal'] = net_normal.detach()
+
+            del net_normal
+            
+            # with autocast():
+            netG.training = True
             res, error = netG.forward(train_data)
             optimizerG.zero_grad()
             error.backward()
             optimizerG.step()
 
-            iter_net_time = time.time()
-            eta = ((iter_net_time - epoch_start_time) / (train_idx + 1)) * len(train_data_loader) - (
-                    iter_net_time - epoch_start_time)
+            iter_end_time = time.time()
 
-            log.add_scalar('loss', error.item(), total_iteration)
+            log.add_scalar('loss', error.item(), current_iteration)
+
+            errors.append(error.item())
+            # If the list has more than 10 items, remove the first one
+            if len(errors) > 10:
+                errors.pop(0)
+            mean_error = sum(errors) / len(errors)
+
+            elapsed_time_per_iteration = iter_end_time - iter_start_time
+            remaining_iterations = total_iteration - current_iteration
+            eta_seconds = elapsed_time_per_iteration * remaining_iterations
+
+            # del train_data
+            torch.cuda.empty_cache()
+
             if train_idx % opt.freq_plot == 0:
-                descrip = 'Name: {0} | Epoch: {1} | {2}/{3} | Err: {4:.06f} | LR: {5:.06f} | Sigma: {6:.02f} | dataT: {7:.05f} | netT: {8:.05f} | ETA: {9:02d}:{10:02d}'.format(
-                    opt.name, epoch, train_idx, len(train_data_loader), error.item(), lr, opt.sigma,
-                    iter_start_time - iter_data_time,
-                    iter_net_time - iter_start_time, int(eta // 60),
-                    int(eta - 60 * (eta // 60)))
-                train_bar.set_description(descrip)
+                descrip = (
+                    f'Name: {opt.name}\n'
+                    f'Epoch: {epoch}\n'
+                    f'Iteration: {current_iteration}/{total_iteration}\n'
+                    f'Err: {mean_error:.06f} (Over last 10 iterations)\n'
+                    f'LR: {lr:.06f}\n'
+                    f'Data Time: {iter_start_time - iter_data_time:.05f}\n'
+                    f'Network Time: {iter_end_time - iter_start_time:.05f}\n'
+                    f'ETA: {int(eta_seconds // 3600)} hours, {int((eta_seconds % 3600) // 60)} minutes'
+                )
+    
+                print(descrip)
 
             if train_idx % opt.freq_save == 0:
-                torch.save(netG.state_dict(), '%s/%s/netG_latest' % (opt.checkpoints_path, opt.name))
-                torch.save(netG.state_dict(), '%s/%s/netG_epoch_%d' % (opt.checkpoints_path, opt.name, epoch))
-                torch.save(optimizerG.state_dict(), '%s/%s/optim_latest' % (opt.checkpoints_path, opt.name))
-                torch.save(optimizerG.state_dict(), '%s/%s/optim_epoch_%d' % (opt.checkpoints_path, opt.name, epoch))
+                print(f"Saving checkpoints at iteration: {current_iteration}")
+                torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_latest')
+                torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_it_{current_iteration}')
+                torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_latest')
+                torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_it_{current_iteration}')
 
-            if train_idx % opt.freq_save_ply == 0:
-                ply_save_path = Path(save_path) / f"{train_idx}.ply"
-                r = res[0].cpu()
-                points = train_data['samples'][0].transpose(0, 1).cpu()
-                save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+            # if train_idx % opt.freq_save_ply == 0:
+            #     ply_save_path = os.path.join(opt.train_results_path, f"{epoch}_{current_iteration}.ply")
+            #     r = res[0].cpu()
+            #     points = train_data['samples'][0].transpose(0, 1).cpu()
+            #     save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+            #     print(f"Saving train ply in {ply_save_path}")
+            #     del r
+            #     del res
+            #     del points
 
             iter_data_time = time.time()
 
-        if epoch!=0 and epoch%opt.freq_val == 0:
-            print('Val now:')
+        if epoch != 0 and epoch % opt.freq_val == 0:
+            print("Performing Validation Now")
             val_loss = validate(opt, netG, netN, val_data_loader, epoch)
             log.add_scalar('val_loss', val_loss, epoch)
             print('Current val loss: ', val_loss)
-        # log.add_scalar('val_loss'. val_loss, epoch)
+
         
         # update learning rate
         lr = adjust_learning_rate(optimizerG, epoch, lr, [5, 10, 25], 0.1)
-        torch.cuda.empty_cache()
+        train_dataset.clear_cache()
+
+    del train_data
 
     log.close()
 
@@ -170,14 +189,11 @@ def validate(opt, netG, netN, val_data_loader, epoch):
     test_netN = netN.module
     test_netG.eval()
     test_netN.eval()
-
     mean_error = 0
 
     for i, val_data in tqdm(enumerate(val_data_loader), total=len(val_data_loader)):
-        # val_save_path = os.path.join(opt.val_results_path, f"{epoch}_{i+1}.obj")
-        val_save_dir = os.path.join("F:/SS23/AT3DCV/at3dcv_project/results/synthetic_first_trial_overfitting_coarse", "val_results")
-        os.makedirs(val_save_dir, exist_ok=True)
-        val_save_path = os.path.join(val_save_dir, f"{epoch}_{i}.obj")    
+        val_save_path = os.path.join(opt.val_results_path, f"{epoch}_{i+1}.obj")
+
         if i >= 4:
             break
 
@@ -191,6 +207,8 @@ def validate(opt, netG, netN, val_data_loader, epoch):
             
         val_data['normal'] = net_normal.detach()
 
+        del net_normal
+
         with torch.no_grad():
 
             if opt.val_type == 'mse':
@@ -202,7 +220,7 @@ def validate(opt, netG, netN, val_data_loader, epoch):
             else:
                 print('Generating mesh (inference) ... ')
                 test_netG.training = False
-                gen_validation(opt, test_netG, device, val_data, epoch, i, val_save_dir, threshold=0.5, use_octree=True)
+                gen_validation(opt, test_netG, device, val_data, epoch, i, threshold=0.5, use_octree=True)
 
                 # val p2s error:
                 num_samples = 10000
@@ -229,6 +247,19 @@ def validate(opt, netG, netN, val_data_loader, epoch):
         #     del res
         #     del points
     return error
+    
+
+
+
+    
+
+def main():
+    opt = parse_config()
+    init_paths(opt)
+    train(opt) 
 
 if __name__ == '__main__':
-    train(opt)
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    print("Using device: ", device)
+    torch.cuda.empty_cache()
+    main()

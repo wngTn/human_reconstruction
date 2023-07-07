@@ -28,7 +28,6 @@ def parse_config(argv=None):
     parser.add_argument('--name', type=str, default='deepmulticap', help='name of a model/experiment.')
     
     # Datasets related
-    parser.add_argument('--log_path', type=str, default='./train_log')
     parser.add_argument('--train_dataroot', type=str, required=True,
                         help='path to all train data')
     parser.add_argument('--val_dataroot', type=str, required=True, help='path to all val data')
@@ -38,14 +37,16 @@ def parse_config(argv=None):
     parser.add_argument('--loadSize', type=int, default=512, help='load size of input image')
     parser.add_argument('--b_min', nargs='+', default=[-3, -2, -3], type=float)
     parser.add_argument('--b_max', nargs='+', default=[3, 14, 3], type=float)
-    parser.add_argument('--smpl_faces', type=str, default='/media/data1/shaoruizhi/Multiview_Pair/lib/data/smplx_fine.obj')
+    parser.add_argument('--smpl_faces', type=str, default='')
 
-    parser.add_argument('--overfitting', action='store_true', help='overfitting on a single frame')
-
+    parser.add_argument('--overfitting', action='store_true', help='overfitting on a few frames')
+    parser.add_argument('--val_size', type=int, default=10, help='num of validation data to sample')
+    
     # Experiment related
-    parser.add_argument('--num_views', type=int, default=1, help='How many views to use for multiview network.')
     parser.add_argument('--random_multiview', action='store_true', help='Select random multiview combination.')
-    parser.add_argument('--random_fix_view', action='store_true', help='Select random multiview combination.')
+    parser.add_argument('--cameras', nargs='+', type=int, help='cameras to use')
+    parser.add_argument('--persons', nargs='+', type=int, help='persons to use')
+    parser.add_argument('--frames', nargs='+', type=int, help='frames to use')
 
     # Training related
     parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2, -1 for CPU mode')
@@ -59,8 +60,11 @@ def parse_config(argv=None):
     parser.add_argument('--learning_rate', type=float, default=1e-3, help='adam learning rate')
     parser.add_argument('--num_epoch', type=int, default=1000, help='num epoch to train')
 
+    parser.add_argument('--val_step', type=int, default=50, help='num of train iterations for validation')
+    parser.add_argument('--val_type', type=str, default='mse', help='use mse or p2s as val error, if the latter, mesh will be generated')
+
     
-    parser.add_argument('--freq_plot', type=int, default=10, help='freqency of the save_checkpoints')
+    parser.add_argument('--freq_plot', type=int, default=10, help='freqency of the print')
     parser.add_argument('--freq_save', type=int, default=50, help='freqency of the save_checkpoints')
     parser.add_argument('--freq_save_ply', type=int, default=100, help='freqency of the save ply')
     parser.add_argument('--freq_normal_show', type=int, default=1000, help='freqency of the save ply')
@@ -118,12 +122,9 @@ def parse_config(argv=None):
     # for infer
     parser.add_argument('--infer', action='store_true')
     parser.add_argument('--no_correct', action='store_true')
-    parser.add_argument('--yaw_list', type=int, nargs='+', default=[0, 1, 2, 3])
-    parser.add_argument('--infer_reverse', action='store_true', help='infer rotation')
     parser.add_argument('--flip_x', action='store_true')
 
     # path
-    parser.add_argument('--checkpoints_path', type=str, default='./checkpoints', help='path to save checkpoints')
     parser.add_argument('--load_netG_checkpoint_path', type=str, default=None, help='path to save checkpoints')
     parser.add_argument('--load_netN_checkpoint_path', type=str, default=None, help='path to save checkpoints')
     parser.add_argument('--load_optim_checkpoint_path', type=str, default=None, help='path to save checkpoints')

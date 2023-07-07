@@ -5,7 +5,7 @@ log_path: logs/synthetic_first_trial_overfitting_coarse_pred
 gpu_ids: 0
 num_threads: 4
 batch_size: 1
-infer: False
+infer: True
 
 coarse_part: True
 
@@ -13,28 +13,37 @@ coarse_part: True
 num_views: 4
 flip_x: False
 
+######### mod #########
+# DATASET PARAMETERS
+cameras: [0, 2, 6, 10]
+random_multiview: False
+persons: [0]
+frames: [0, 1, 2, 3]
+#######################
+
 # network
 mlp_dim: [323, 1024, 512, 256, 128, 1]
 fine_mlp_dim: [355, 512, 256, 128, 1]
 
-train_dataroot: data/Synthetic/first_trial
-val_dataroot: data/Synthetic/first_trial
+train_dataroot: T:/at3dcv_project/data/Synthetic/easy
+val_dataroot: T:/at3dcv_project/data/Synthetic/easy
 
 freq_val: 5
 
 # smpl
 # necessary because ground truth is smplx
 smpl_faces: lib/data/smpl_open3d.obj
-smpl_path: Obj_Pred
+smpl_path: Obj
 obj_path: Obj 
 
 load_netN_checkpoint_path: checkpoints/demo/netN_latest
+load_netG_checkpoint_path: outputs/07_01-23_51_08_Synthetic_overfitting_coarse/checkpoints/netG_latest
 
 serial_batches: True
 
 # marching cube
 resolution: 256
-mc_threshold: 0.6
+mc_threshold: 0.5
 
 # debug_data: True
 overfitting: True
