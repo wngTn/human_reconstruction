@@ -33,9 +33,9 @@ opt = parse_config()
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 def train(opt):
-    np.random.seed(int(time.time()))
-    random.seed(int(time.time()))
-    torch.manual_seed(int(time.time()))
+    # np.random.seed(int(time.time()))
+    # random.seed(int(time.time()))
+    # torch.manual_seed(int(time.time()))
     log = SummaryWriter(opt.log_path)
     total_iteration = 0
     netG = DMCNet(opt, projection_mode='perspective').to(device)
@@ -66,8 +66,8 @@ def train(opt):
     print("loaded finished!")
     
     train_dataset = SyntheticDataset(opt, phase='train', num_views=4)
-    val_dataset = SyntheticDataset(opt, phase='inference', num_views=4)
-    test_dataset = SyntheticDataset(opt, phase='test', num_views=4)
+    val_dataset = SyntheticDataset(opt, phase='val', num_views=4)
+    # test_dataset = SyntheticDataset(opt, phase='test', num_views=4)
         
     projection_mode = train_dataset.projection_mode
     print('projection_mode:', projection_mode)
@@ -76,6 +76,12 @@ def train(opt):
                                    batch_size=opt.batch_size, shuffle=not opt.serial_batches,
                                    num_workers=opt.num_threads, pin_memory=opt.pin_memory)
     print('train data size: ', len(train_data_loader))
+
+    val_data_loader = DataLoader(val_dataset,
+                                    batch_size=1, shuffle=False,
+                                    num_workers=1, pin_memory=opt.pin_memory)
+    print('val data size: ', len(val_data_loader))
+
 
     os.makedirs(opt.checkpoints_path, exist_ok=True)
     os.makedirs(opt.results_path, exist_ok=True)
@@ -146,15 +152,83 @@ def train(opt):
 
             iter_data_time = time.time()
 
-        # val_loss = validate(netG, val_dataset)
+        if epoch!=0 and epoch%opt.freq_val == 0:
+            print('Val now:')
+            val_loss = validate(opt, netG, netN, val_data_loader, epoch)
+            log.add_scalar('val_loss', val_loss, epoch)
+            print('Current val loss: ', val_loss)
         # log.add_scalar('val_loss'. val_loss, epoch)
         
         # update learning rate
         lr = adjust_learning_rate(optimizerG, epoch, lr, [5, 10, 25], 0.1)
-        # train_dataset.clear_cache()
+        torch.cuda.empty_cache()
 
     log.close()
 
+def validate(opt, netG, netN, val_data_loader, epoch):
+    test_netG = netG.module
+    test_netN = netN.module
+    test_netG.eval()
+    test_netN.eval()
+
+    mean_error = 0
+
+    for i, val_data in tqdm(enumerate(val_data_loader), total=len(val_data_loader)):
+        # val_save_path = os.path.join(opt.val_results_path, f"{epoch}_{i+1}.obj")
+        val_save_dir = os.path.join("F:/SS23/AT3DCV/at3dcv_project/results/synthetic_first_trial_overfitting_coarse", "val_results")
+        os.makedirs(val_save_dir, exist_ok=True)
+        val_save_path = os.path.join(val_save_dir, f"{epoch}_{i}.obj")    
+        if i >= 4:
+            break
+
+        for key in val_data:
+            if torch.is_tensor(val_data[key]):
+                val_data[key] = val_data[key].to(device=device)
+
+        with torch.no_grad():
+            net_normal = netN.forward(val_data['image'])
+            net_normal = net_normal * val_data['mask']
+            
+        val_data['normal'] = net_normal.detach()
+
+        with torch.no_grad():
+
+            if opt.val_type == 'mse':
+                res, error = test_netG.forward(val_data)
+                error = error.item()
+                # print(type(error), error)
+                mean_error = (mean_error * i + error) / (i + 1)
+                error = mean_error
+            else:
+                print('Generating mesh (inference) ... ')
+                test_netG.training = False
+                gen_validation(opt, test_netG, device, val_data, epoch, i, val_save_dir, threshold=0.5, use_octree=True)
+
+                # val p2s error:
+                num_samples = 10000
+                src_mesh = trimesh.load(val_save_path)
+                # tgt_mesh = trimesh.load(os.path.join(val_data['OBJ'], f"person_{person_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))
+                # tgt_mesh = trimesh.load(os.path.join(val_data['OBJ'], f"person_0", "combined", f'smplx_{str(i+1).zfill(6)}.obj'))
+                tgt_mesh = trimesh.load(val_data['mesh_path'][0])
+                src_surf_pts, _ = trimesh.sample.sample_surface(src_mesh, num_samples)
+                _, src_tgt_dist, _ = trimesh.proximity.closest_point(tgt_mesh, src_surf_pts)
+                src_tgt_dist[np.isnan(src_tgt_dist)] = 0
+                src_tgt_dist[~np.isfinite(src_tgt_dist)] = 0
+                p2s_error = src_tgt_dist.mean()
+                error = p2s_error
+                print('p2s error = ', p2s_error)
+
+        # if i % opt.freq_save_ply == 0:
+        #     ply_save_path = os.path.join(opt.val_results_path, f"{epoch}_{i}.ply")
+        #     r = res[0].cpu()
+        #     points = val_data['samples'][0].transpose(0, 1).cpu()
+        #     del val_data
+        #     save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+        #     print(f"Saving val ply in {ply_save_path}")
+        #     del r
+        #     del res
+        #     del points
+    return error
 
 if __name__ == '__main__':
     train(opt)

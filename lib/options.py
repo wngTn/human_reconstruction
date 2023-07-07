@@ -66,6 +66,8 @@ def parse_config(argv=None):
     parser.add_argument('--freq_normal_show', type=int, default=1000, help='freqency of the save ply')
 
     parser.add_argument('--freq_val', type=int, default=100, help='freqency validation')
+    parser.add_argument('--val_type', type=str, default='mse', help='use mse or p2s as val error, if the latter, mesh will be generated')
+    # parser.add_argument('val_results_path', type=str)
 
     # Testing related
     parser.add_argument('--resolution', type=int, default=256, help='# of grid in mesh reconstruction')
