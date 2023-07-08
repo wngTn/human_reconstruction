@@ -241,7 +241,6 @@ class DMCNet(BaseNet):
                 point_local_feat = torch.cat(point_local_feat_list, 1)
 
                 # out of image plane is always set to 0
-                torch.cuda.empty_cache()
                 pred = self.surface_classifier(point_local_feat)
                 self.intermediate_preds_list.append(pred)
                 

@@ -12,7 +12,7 @@ from .geometry import index
 
 def gen_validation(opt, net, device, data, epoch, iteration, use_octree=True, threshold=0.5):
     image_tensor = data['image'].squeeze(0)
-    calib_tensor = data['calib']
+    calib_tensor = data['calib'].squeeze(0)
     extrinsic = data['extrinsic']
     vox_tensor = data['vox']
     smpl_normal = data['smpl_normal']
@@ -54,15 +54,8 @@ def gen_validation(opt, net, device, data, epoch, iteration, use_octree=True, th
     Image.fromarray(np.uint8(save_img[:,:,::-1])).save(save_img_path)
 
     try:
-        # verts, faces, _, _, error = reconstruction_3d(
-            # net, device, calib_tensor.unsqueeze(0), extrinsic, opt.resolution, b_min, b_max, use_octree=use_octree, threshold=threshold)
-        torch.cuda.empty_cache()
-        # num_points_for_val = data['samples'].shape[2]
-        # verts, faces, _, _ = reconstruction_3d(net, device, calib_tensor, extrinsic, opt.resolution, np.array(b_min.squeeze(0).cpu()), np.array(b_max.squeeze(0).cpu()), 
-                                                    #   pts, labels, use_octree=use_octree, num_samples = num_points_for_val, threshold=threshold)
         verts, faces, _, _ = reconstruction_3d(
-            net, device, calib_tensor, extrinsic, opt.resolution, np.array(b_min.squeeze(0).cpu()), np.array(b_max.squeeze(0).cpu()), use_octree=use_octree, threshold=threshold)
-        
+            net, device, calib_tensor.unsqueeze(0), extrinsic, opt.resolution, np.array(b_min.squeeze(0).cpu()), np.array(b_max.squeeze(0).cpu()), use_octree=use_octree, threshold=threshold)
         verts_tensor = torch.from_numpy(verts.T).unsqueeze(0).to(device=device).float()
         xyz_tensor = net.projection(verts_tensor, calib_tensor.squeeze(0)[:1])
         uv = xyz_tensor[:, :2, :]

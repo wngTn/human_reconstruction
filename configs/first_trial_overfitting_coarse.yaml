@@ -1,5 +1,5 @@
 # Overfits with ground truth data
-name: synthetic_overfitting_coarse
+name: first_trial_overfitting_coarse
 
 coarse_part: True
 infer: False
@@ -11,38 +11,42 @@ batch_size: 1
 serial_batches: True
 pin_memory: False
 learning_rate: 1e-3
-num_epoch: 50
+num_epoch: 10
 
 val_size: 5
+val_type: "notmse"
 
 # DATASET PATH
-train_dataroot: T:/at3dcv_project/data/Synthetic/easy
-val_dataroot: T:/at3dcv_project/data/Synthetic/easy
+train_dataroot: data/Synthetic/first_trial
+val_dataroot: data/Synthetic/first_trial
 smpl_faces: lib/data/smplx_multi.obj
 smpl_path: Obj
 obj_path: Obj
 loadSize: 512
 
 # DATASET PARAMETERS
-cameras: [0, 2, 6, 10]
+cameras: [0, 1, 2, 3]
 random_multiview: False
 persons: [0]
-frames: [0, 1, 2, 3]
+frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 # SAMPLING REALTED
 sigma: 0.25 # Pertupation standard deviation for positions
-num_sample_inout: 400
+num_sample_inout: 4000
 
 
 # network
-mlp_dim: [323, 1024, 512, 256, 128, 1]
+mlp_dim: [323, 512, 512, 256, 128, 1]
 fine_mlp_dim: [355, 512, 256, 128, 1]
 
 # PLOTTING PARAMETERS
-freq_plot: 10 
-freq_save: 50
-freq_save_ply: 50
+freq_plot: 5 
+freq_save: 10
+freq_save_ply: 10
 freq_val: 2 # Epochs
 
 # PATHS
 load_netN_checkpoint_path: checkpoints/demo/netN_latest
+# load_netG_checkpoint_path: outputs/07_07-17_53_54_First_trial_overfitting_coarse/checkpoints/netG_latest
+
+resolution: 128
