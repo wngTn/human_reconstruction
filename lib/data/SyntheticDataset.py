@@ -31,7 +31,6 @@ class SyntheticDataset(Dataset):
         self.opt = opt
         self.projection_mode = 'perspective'
         self.phase = phase
-        self.voxel_shape = (128, 128, 128)
         self.is_train = (phase == 'train')
 
         # Path setup
@@ -207,7 +206,7 @@ class SyntheticDataset(Dataset):
         # print(person_id, self.cache_data.__len__())
         root_dir = self.OBJ
         # if self.is_train:
-        if self.phase != 'inference':
+        if self.is_train:
             mesh = trimesh.load(
                 os.path.join(root_dir, f"person_{person_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))
             if self.opt.coarse_part:
@@ -273,10 +272,6 @@ class SyntheticDataset(Dataset):
 
         return {'b_min': b_min, 'b_max': b_max, 'scale': scale, 'center': center, 'direction': normal}
 
-    def pad_to_shape(self, array):
-        pad_shape = [(0, s - a) for a, s in zip(array.shape, self.voxel_shape)]
-        return np.pad(array, pad_shape, 'constant')
-
     def load_parameters(self, prefix_path):
         parameters = np.load(os.path.join(prefix_path, "output_data.npz"), allow_pickle=True)
         return parameters
@@ -334,15 +329,18 @@ class SyntheticDataset(Dataset):
             extrinsic = extrinsic[:3, :]
             mask = Image.open(mask_path).convert('RGB')
             render = Image.open(render_path).convert('RGB')
-            # normal = cv2.imread(normal_path, cv2.IMREAD_UNCHANGED)
-            # normal = cv2.cvtColor(normal, cv2.COLOR_BGR2RGB).astype(np.uint8)
-            # normal = (self.normalize_image(normal) * 255).astype(np.uint8)
-            # normal = Image.fromarray(normal, 'RGB')
-            normal = Image.open(normal_path).convert('RGB')
-            # depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED).astype(np.uint8)
-            # depth = (self.normalize_image(depth) * 255).astype(np.uint8)
+            normal = cv2.imread(normal_path, cv2.IMREAD_UNCHANGED)
+            normal = cv2.cvtColor(normal, cv2.COLOR_BGR2RGB)
+            normal = (self.normalize_image(normal) * 255).astype(np.uint8)
+            normal = Image.fromarray(normal, 'RGB')
+            # normal = Image.open(normal_path).convert('RGB')
+            depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+            depth = (self.normalize_image(depth) * 255).astype(np.uint8)
+            depth = Image.fromarray(depth)
+            # depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+            # depth = depth.astype(np.float32) / 1000.0
             # depth = Image.fromarray(depth)
-            depth = Image.open(depth_path)
+            # depth = Image.fromarray(depth.astype(np.uint8))
             smpl_norm = Image.open(smpl_norm_path)
 
             imgs_list = [render, depth, normal, mask, smpl_norm]
@@ -452,14 +450,14 @@ class SyntheticDataset(Dataset):
 
             mask_new = mask.filter(MinFilter(3))
             mask = torch.sum(torch.FloatTensor((np.array(mask).reshape((512, 512, -1)))), dim=2) / 255
-            mask[mask > 0] = 1.0
+            mask[mask > 1] = 1.0
             ero_mask = torch.FloatTensor(np.array(mask).reshape((512, 512, -1)))[:, :, 0] / 255
             render = self.to_tensor(render) * mask.reshape(1, 512, 512)
             normal = self.to_tensor(normal) * mask.reshape(1, 512, 512)
             smpl_norm = self.to_tensor(smpl_norm)
 
             mask = torch.sum(torch.FloatTensor((np.array(mask_new).reshape((512, 512, -1)))), dim=2) / 255
-            mask[mask > 0] = 1.0
+            mask[mask > 1] = 1.0
 
             render_list.append(render)
             calib_list.append(calib)
@@ -505,7 +503,7 @@ class SyntheticDataset(Dataset):
 
         # start = time.time()
         sample_data = self.select_sampling_method(frame_id, subject_id, res['b_min'].numpy(), res['b_max'].numpy())
-        if self.phase != 'inference':
+        if self.is_train:
             sample_data = self.visibility_sample(sample_data, res['depth'], res['calib'], res['mask'])
         res.update(sample_data)
         # print(f"Time for sampling: {time.time() - start}")
@@ -560,15 +558,12 @@ class SyntheticDataset(Dataset):
 
         transform[1, 3] = 0.5
         mesh.apply_transform(transform)
-        vox = creation.voxelize(mesh,
-                                pitch=1.0 / 128,
-                                bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
-                                method='binvox',
-                                exact=True)
+        vox = mesh.voxelized(pitch=1.0 / 128,
+                            bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
+                            method='binvox',
+                            exact=True)
         vox.fill()
-
-        voxel_grid = self.pad_to_shape(vox.matrix)
-        res['vox'] = torch.FloatTensor(voxel_grid).unsqueeze(0)
+        res['vox'] = torch.FloatTensor(vox.matrix).unsqueeze(0)
 
         if self.opt.debug_data:
             for num_view_i in range(self.num_views):

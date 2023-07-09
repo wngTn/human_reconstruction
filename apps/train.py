@@ -63,7 +63,7 @@ def train(opt):
         netN.load_state_dict(torch.load(opt.load_netN_checkpoint_path, map_location=device), strict=False)
 
     train_dataset = SyntheticDataset(opt, cache_data=Manager().dict(), cache_data_lock=Lock(), phase='train')
-    val_dataset = SyntheticDataset(opt, cache_data=Manager().dict(), cache_data_lock=Lock(), phase='inference')
+    val_dataset = SyntheticDataset(opt, cache_data=Manager().dict(), cache_data_lock=Lock(), phase='val')
 
     # create data loader
     train_data_loader = DataLoader(train_dataset,
@@ -94,6 +94,7 @@ def train(opt):
         iter_data_time = time.time()
 
         for train_idx, train_data in enumerate(train_data_loader):
+            optimizerG.zero_grad()
             current_iteration += 1
             iter_start_time = time.time()
             # retrieve the data
@@ -103,13 +104,14 @@ def train(opt):
 
             # predict normal
             with torch.no_grad():
-                net_normal = netN.forward(train_data['image'])
+                net_normal = netN(train_data['image'])
                 net_normal = net_normal * train_data['mask']
 
             train_data['normal'] = net_normal.detach()
 
-            res, error = netG.forward(train_data)
-            optimizerG.zero_grad()
+            res, error = netG(train_data)
+            del res
+            
             error.backward()
             optimizerG.step()
 
@@ -119,7 +121,7 @@ def train(opt):
 
             errors.append(error.item())
             # If the list has more than 10 items, remove the first one
-            if len(errors) > 10:
+            if len(errors) > 1:
                 errors.pop(0)
             mean_error = sum(errors) / len(errors)
 
@@ -128,30 +130,31 @@ def train(opt):
             eta_seconds = elapsed_time_per_iteration * remaining_iterations
 
             if train_idx % opt.freq_plot == 0:
-                descrip = (f'Name: {opt.name}\n'
+                descrip = (f'\nName: {opt.name}\n'
                            f'Epoch: {epoch}\n'
                            f'Iteration: {current_iteration}/{total_iteration}\n'
                            f'Err: {mean_error:.06f} (Over last 10 iterations)\n'
                            f'LR: {lr:.06f}\n'
                            f'Data Time: {iter_start_time - iter_data_time:.05f}\n'
                            f'Network Time: {iter_end_time - iter_start_time:.05f}\n'
-                           f'ETA: {int(eta_seconds // 3600)} hours, {int((eta_seconds % 3600) // 60)} minutes')
+                           f'ETA: {int(eta_seconds // 3600)} hours, {int((eta_seconds % 3600) // 60)} minutes\n'
+                           f'------------------------------------------------------------------------------------------')
 
                 print(descrip)
 
-            if train_idx % opt.freq_save == 0:
-                print(f"Saving checkpoints at iteration: {current_iteration}")
-                torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_latest')
-                torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_it_{current_iteration}')
-                torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_latest')
-                torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_it_{current_iteration}')
+            # if train_idx % opt.freq_save == 0:
+            #     print(f"Saving checkpoints at iteration: {current_iteration}")
+            #     torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_latest')
+            #     torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_it_{current_iteration}')
+            #     torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_latest')
+            #     torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_it_{current_iteration}')
 
-            if train_idx % opt.freq_save_ply == 0:
-                ply_save_path = os.path.join(opt.train_results_path, f"{epoch}_{current_iteration}.ply")
-                r = res[0].cpu()
-                points = train_data['samples'][0].transpose(0, 1).cpu()
-                save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
-                print(f"Saving train ply in {ply_save_path}")
+            # if train_idx % opt.freq_save_ply == 0:
+            #     ply_save_path = os.path.join(opt.train_results_path, f"{epoch}_{current_iteration}.ply")
+            #     r = res[0].cpu()
+            #     points = train_data['samples'][0].transpose(0, 1).cpu()
+            #     save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+            #     print(f"Saving train ply in {ply_save_path}")
 
             iter_data_time = time.time()
 
@@ -162,7 +165,7 @@ def train(opt):
             # print('Current val loss: ', val_loss)
 
         # update learning rate
-        lr = adjust_learning_rate(optimizerG, epoch, lr, [5, 10, 25], 0.1)
+        lr = adjust_learning_rate(optimizerG, epoch, lr, [15, 20, 25], 0.1)
         train_dataset.clear_cache()
 
     log.close()
