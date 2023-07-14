@@ -141,19 +141,19 @@ def train(opt):
 
                 print(descrip)
 
-            # if train_idx % opt.freq_save == 0:
-            #     print(f"Saving checkpoints at iteration: {current_iteration}")
-            #     torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_latest')
-            #     torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_it_{current_iteration}')
-            #     torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_latest')
-            #     torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_it_{current_iteration}')
+            if train_idx % opt.freq_save == 0:
+                print(f"Saving checkpoints at iteration: {current_iteration}")
+                torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_latest')
+                torch.save(netG.state_dict(), f'{opt.checkpoints_path}/netG_it_{current_iteration}')
+                torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_latest')
+                torch.save(optimizerG.state_dict(), f'{opt.checkpoints_path}/optim_it_{current_iteration}')
 
-            # if train_idx % opt.freq_save_ply == 0:
-            #     ply_save_path = os.path.join(opt.train_results_path, f"{epoch}_{current_iteration}.ply")
-            #     r = res[0].cpu()
-            #     points = train_data['samples'][0].transpose(0, 1).cpu()
-            #     save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
-            #     print(f"Saving train ply in {ply_save_path}")
+            if train_idx % opt.freq_save_ply == 0:
+                ply_save_path = os.path.join(opt.train_results_path, f"{epoch}_{current_iteration}.ply")
+                r = res[0].cpu()
+                points = train_data['samples'][0].transpose(0, 1).cpu()
+                save_samples_truncted_prob(ply_save_path, points.detach().numpy(), r.detach().numpy())
+                print(f"Saving train ply in {ply_save_path}")
 
             iter_data_time = time.time()
 
