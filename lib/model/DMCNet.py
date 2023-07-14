@@ -194,6 +194,7 @@ class DMCNet(BaseNet):
         :param labels: Optional [B, Res, N] gt labeling
         :return: [B, Res, N] predictions for each point
         '''
+        # あいしてる、사랑해요
         if labels is not None:
             self.labels = labels
         # 2d part

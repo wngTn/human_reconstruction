@@ -31,7 +31,6 @@ class SyntheticDataset(Dataset):
         self.opt = opt
         self.projection_mode = 'perspective'
         self.phase = phase
-        self.voxel_shape = (128, 128, 128)
         self.is_train = (phase == 'train')
 
         # Path setup
@@ -276,10 +275,6 @@ class SyntheticDataset(Dataset):
             normal = -normal
 
         return {'b_min': b_min, 'b_max': b_max, 'scale': scale, 'center': center, 'direction': normal}
-
-    def pad_to_shape(self, array):
-        pad_shape = [(0, s - a) for a, s in zip(array.shape, self.voxel_shape)]
-        return np.pad(array, pad_shape, 'constant')
 
     def load_parameters(self, prefix_path):
         parameters = np.load(os.path.join(prefix_path, "output_data.npz"), allow_pickle=True)
@@ -562,15 +557,12 @@ class SyntheticDataset(Dataset):
 
         transform[1, 3] = 0.5
         mesh.apply_transform(transform)
-        vox = creation.voxelize(mesh,
-                                pitch=1.0 / 128,
-                                bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
-                                method='binvox',
-                                exact=True)
+        vox = mesh.voxelized(pitch=1.0 / 128,
+                            bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
+                            method='binvox',
+                            exact=True)
         vox.fill()
-
-        voxel_grid = self.pad_to_shape(vox.matrix)
-        res['vox'] = torch.FloatTensor(voxel_grid).unsqueeze(0)
+        res['vox'] = torch.FloatTensor(vox.matrix).unsqueeze(0)
 
         if self.opt.debug_data:
             for num_view_i in range(self.num_views):
