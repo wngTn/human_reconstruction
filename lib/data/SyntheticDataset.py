@@ -202,12 +202,11 @@ class SyntheticDataset(Dataset):
 
     def select_sampling_method(self, frame_id, person_id, b_min, b_max):
         person_key = f"{person_id}_{frame_id}"
-        # if self.cache_data.__contains__(person_key):
-        #     return self.cache_data[person_key]
+        if person_key in self.cache_data: # self.cache_data.__contains__(person_key):
+            return self.cache_data[person_key]
         # print(person_id, self.cache_data.__len__())
         root_dir = self.OBJ
-        # if self.is_train:
-        if self.phase != 'inference':
+        if self.phase != 'test':
             mesh = trimesh.load(
                 os.path.join(root_dir, f"person_{person_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))
             if self.opt.coarse_part:
@@ -253,21 +252,26 @@ class SyntheticDataset(Dataset):
         scale = torch.zeros(1).float()
         center = torch.zeros(3).float()
 
-        t3_mesh = readobj(
+        mesh = readobj(
             os.path.join(self.OBJ, f"person_{person_id}", "combined",
-                         f'smplx_{str(frame_id).zfill(6)}.obj'))['vi'][:, :3]
-        b0 = np.min(t3_mesh, axis=0)
-        b1 = np.max(t3_mesh, axis=0)
+                         f'smplx_{str(frame_id).zfill(6)}.obj'))
+        # Shape (N, 3)
+        mesh_vertices = mesh['vi'][:, :3]
+        # Shape (N', 3)
+        mesh_faces = mesh['f'][:, :, 0]
+        b0 = np.min(mesh_vertices, axis=0)
+        b1 = np.max(mesh_vertices, axis=0)
         center = torch.FloatTensor((b0 + b1) / 2)
         scale = torch.FloatTensor([np.min(1.0 / (b1 - b0)) * 0.9])
         b_min = center - 0.5 / scale
         b_max = center + 0.5 / scale
 
         normal = np.zeros((3))
-        for f in self.smpl_faces:
-            a, b, c = t3_mesh[f[0]][0], t3_mesh[f[1]][0], t3_mesh[f[2]][0]
+        sampled_faces = mesh_faces[np.random.choice(len(mesh_faces), size=(256))] 
+        for f in sampled_faces:
+            a, b, c = mesh_vertices[f[0]][0], mesh_vertices[f[1]][0], mesh_vertices[f[2]][0]
             normal += cross_3d(c - a, b - a)
-        del t3_mesh
+        del mesh_vertices
         if self.opt.flip_normal:
             normal = -normal
 
@@ -505,7 +509,7 @@ class SyntheticDataset(Dataset):
 
         # start = time.time()
         sample_data = self.select_sampling_method(frame_id, subject_id, res['b_min'].numpy(), res['b_max'].numpy())
-        if self.phase != 'inference':
+        if self.phase != 'test':
             sample_data = self.visibility_sample(sample_data, res['depth'], res['calib'], res['mask'])
         res.update(sample_data)
         # print(f"Time for sampling: {time.time() - start}")
@@ -594,5 +598,7 @@ class SyntheticDataset(Dataset):
 # get options
 opt = parse_config()
 if __name__ == '__main__':
-    data = SyntheticDataset(opt, phase='train', num_views=4)
-    print(data[0]['name'])
+    import ipdb; ipdb.set_trace()
+    t3_mesh = readobj("/Users/tonywang/Temp/cloth/Obj/person_0/merged/smplx_000000.obj")['vi'][:, :3]
+    # data = SyntheticDataset(opt, phase='train', num_views=4)
+    # print(data[0]['name'])
