@@ -338,15 +338,13 @@ class SyntheticDataset(Dataset):
             extrinsic = extrinsic[:3, :]
             mask = Image.open(mask_path).convert('RGB')
             render = Image.open(render_path).convert('RGB')
-            # normal = cv2.imread(normal_path, cv2.IMREAD_UNCHANGED)
-            # normal = cv2.cvtColor(normal, cv2.COLOR_BGR2RGB).astype(np.uint8)
-            # normal = (self.normalize_image(normal) * 255).astype(np.uint8)
-            # normal = Image.fromarray(normal, 'RGB')
-            normal = Image.open(normal_path).convert('RGB')
-            # depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED).astype(np.uint8)
-            # depth = (self.normalize_image(depth) * 255).astype(np.uint8)
-            # depth = Image.fromarray(depth)
-            depth = Image.open(depth_path)
+            normal = cv2.imread(normal_path, cv2.IMREAD_UNCHANGED)
+            normal = cv2.cvtColor(normal, cv2.COLOR_BGR2RGB)
+            normal = (self.normalize_image(normal) * 255).astype(np.uint8)
+            normal = Image.fromarray(normal, 'RGB')
+            depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+            depth = (self.normalize_image(depth) * 255).astype(np.uint8)
+            depth = Image.fromarray(depth)
             smpl_norm = Image.open(smpl_norm_path)
 
             imgs_list = [render, depth, normal, mask, smpl_norm]
@@ -456,14 +454,14 @@ class SyntheticDataset(Dataset):
 
             mask_new = mask.filter(MinFilter(3))
             mask = torch.sum(torch.FloatTensor((np.array(mask).reshape((512, 512, -1)))), dim=2) / 255
-            mask[mask > 0] = 1.0
+            mask[mask > 1] = 1.0
             ero_mask = torch.FloatTensor(np.array(mask).reshape((512, 512, -1)))[:, :, 0] / 255
             render = self.to_tensor(render) * mask.reshape(1, 512, 512)
             normal = self.to_tensor(normal) * mask.reshape(1, 512, 512)
             smpl_norm = self.to_tensor(smpl_norm)
 
             mask = torch.sum(torch.FloatTensor((np.array(mask_new).reshape((512, 512, -1)))), dim=2) / 255
-            mask[mask > 0] = 1.0
+            mask[mask > 1] = 1.0
 
             render_list.append(render)
             calib_list.append(calib)
