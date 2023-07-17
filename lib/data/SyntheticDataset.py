@@ -27,14 +27,14 @@ os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 
 class SyntheticDataset(Dataset):
 
-    def __init__(self, opt, cache_data, cache_data_lock, phase='train'):
+    def __init__(self, opt, phase):
         self.opt = opt
         self.projection_mode = 'perspective'
         self.phase = phase
         self.is_train = (phase == 'train')
 
         # Path setup
-        self.root = opt.train_dataroot
+        self.root = opt.train_dataroot if self.is_train else opt.val_dataroot
         self.RENDER = os.path.join(self.root, 'RGB')
         self.PARAM = os.path.join(self.root, 'output_data.npz')
         self.OBJ = os.path.join(self.root, 'Obj')
@@ -43,31 +43,20 @@ class SyntheticDataset(Dataset):
         self.NORMAL = os.path.join(self.root, 'Normal')
         self.SMPL_NORMAL = os.path.join(self.root, 'smpl_pos')
         self.MASK = os.path.join(self.root, 'Segmentation')
-        self.VAL_ROOT = opt.val_dataroot
 
         if opt.obj_path is not None:
             self.OBJ = os.path.join(self.root, opt.obj_path)
         if opt.smpl_path is not None:
             self.SMPL = os.path.join(self.root, opt.smpl_path)
 
-        self.smpl_faces = readobj(opt.smpl_faces)['f']
-
         self.load_size = self.opt.loadSize
 
         self.cameras = self.opt.cameras
         self.num_views = len(self.cameras)
         self.subjects = self.opt.persons
-        self.frames = self.opt.frames
-
-        self.cache_data = cache_data
-        self.cache_data_lock = cache_data_lock
+        self.frames = self.opt.train_frames if self.is_train else self.opt.val_frames
 
         self.num_sample_inout = self.opt.num_sample_inout
-
-        # if phase == 'val':
-        #     self.cameras = [i + 1 for i in self.opt.cameras]
-        #     self.frames = [i + 1 for i in self.opt.frames]
-        #     self.num_sample_inout = 100
 
         # PIL to tensor
         self.to_tensor = transforms.Compose([
@@ -87,13 +76,12 @@ class SyntheticDataset(Dataset):
     def __len__(self):
         return len(self.frames) * len(self.subjects)
 
-    def clear_cache(self):
-        self.cache_data.clear()
-
-    def visibility_sample(self, data, depth, calib, mask=None):
-        surface_points = data['surface_points']
-        sample_points = data['sample_points']
-        inside = data['inside']
+    def visibility_sample(self, data_dict):
+        surface_points = data_dict['surface_points']
+        sample_points = data_dict['sample_points']
+        inside = data_dict['inside']
+        calib = data_dict['calib']
+        depth = data_dict['depth']
         # plt.subplot(121)
         # plt.imshow(depth[0])
         # plt.subplot(122)
@@ -193,17 +181,24 @@ class SyntheticDataset(Dataset):
             samples = np.concatenate([inside_points, outside_points], 0).T
             labels = np.concatenate([np.ones((1, inside_points.shape[0])), np.zeros((1, outside_points.shape[0]))], 1)
 
+            samples = samples.astype(np.float32)
+            labels = labels
+
             samples = torch.Tensor(samples).float()
             labels = torch.Tensor(labels).float()
             if self.opt.debug_data:
                 save_samples_truncted_prob('show/samples.ply', samples.numpy().T, labels.numpy().T)
-        return {'samples': samples, 'labels': labels, 'feat_points': data['feat_points']}
 
-    def select_sampling_method(self, frame_id, person_id, b_min, b_max):
-        person_key = f"{person_id}_{frame_id}"
-        if person_key in self.cache_data: # self.cache_data.__contains__(person_key):
-            return self.cache_data[person_key]
-        # print(person_id, self.cache_data.__len__())
+        data_dict['samples'] = samples
+        data_dict['labels'] = labels
+        data_dict['feat_points'] = torch.zeros(1)
+        return data_dict
+
+    def select_sampling_method(self, data_dict):
+        person_id = data_dict['subject_id']
+        frame_id = data_dict['frame_id']
+        b_min = data_dict['b_min'].numpy()
+        b_max = data_dict['b_max'].numpy()
         root_dir = self.OBJ
         if self.phase != 'test':
             mesh = trimesh.load(
@@ -223,7 +218,8 @@ class SyntheticDataset(Dataset):
             # add random points within image space
             length = b_max - b_min
             random_points = np.random.rand(self.num_sample_inout, 3) * length + b_min
-            sample_points = np.concatenate([sample_points, random_points], 0)
+            sample_points = np.concatenate([sample_points, random_points], 0).astype(np.float32)
+            surface_points = surface_points.astype(np.float32)
             inside = mesh.contains(sample_points)
 
             del mesh
@@ -234,26 +230,31 @@ class SyntheticDataset(Dataset):
 
         feat_points = torch.zeros(1)
 
-        self.cache_data_lock.acquire()
-        self.cache_data[person_key] = {
-            'sample_points': sample_points,
-            'surface_points': surface_points,
-            'inside': inside,
-            'feat_points': feat_points
-        }
-        self.cache_data_lock.release()
+        # self.cache_data_lock.acquire()
+        # self.cache_data[person_key] = {
+        #     'sample_points': sample_points,
+        #     'surface_points': surface_points,
+        #     'inside': inside,
+        #     'feat_points': feat_points
+        # }
+        # self.cache_data_lock.release()
+        data_dict['sample_points'] = sample_points
+        data_dict['surface_points'] = surface_points
+        data_dict['inside'] = inside
+        data_dict['feat_points'] = feat_points
 
-        return self.cache_data[person_key]
+        return data_dict
 
-    def get_norm(self, frame_id, person_id):
+    def get_norm(self, data_dict):
+        person_id = data_dict['subject_id']
+        frame_id = data_dict['frame_id']
+
         b_min = torch.zeros(3).float()
         b_max = torch.zeros(3).float()
         scale = torch.zeros(1).float()
         center = torch.zeros(3).float()
 
-        mesh = readobj(
-            os.path.join(self.OBJ, f"person_{person_id}", "combined",
-                         f'smplx_{str(frame_id).zfill(6)}.obj'))
+        mesh = readobj(os.path.join(self.OBJ, f"person_{person_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))
         # Shape (N, 3)
         mesh_vertices = mesh['vi'][:, :3]
         # Shape (N', 3)
@@ -266,7 +267,7 @@ class SyntheticDataset(Dataset):
         b_max = center + 0.5 / scale
 
         normal = np.zeros((3))
-        sampled_faces = mesh_faces[np.random.choice(len(mesh_faces), size=(256))] 
+        sampled_faces = mesh_faces[np.random.choice(len(mesh_faces), size=(512))][..., None]
         for f in sampled_faces:
             a, b, c = mesh_vertices[f[0]][0], mesh_vertices[f[1]][0], mesh_vertices[f[2]][0]
             normal += cross_3d(c - a, b - a)
@@ -274,7 +275,12 @@ class SyntheticDataset(Dataset):
         if self.opt.flip_normal:
             normal = -normal
 
-        return {'b_min': b_min, 'b_max': b_max, 'scale': scale, 'center': center, 'direction': normal}
+        data_dict['b_min'] = b_min
+        data_dict['b_max'] = b_max
+        data_dict['scale'] = scale
+        data_dict['center'] = center
+        data_dict['direction'] = normal
+        return data_dict
 
     def load_parameters(self, prefix_path):
         parameters = np.load(os.path.join(prefix_path, "output_data.npz"), allow_pickle=True)
@@ -301,7 +307,10 @@ class SyntheticDataset(Dataset):
     def normalize_image(self, image):
         return (image - np.min(image)) / (np.max(image) - np.min(image))
 
-    def load_render_data(self, frame_id, person_id):
+    def load_render_data(self, data_dict):
+
+        frame_id = data_dict['frame_id']
+        person_id = data_dict['subject_id']
 
         calib_list = []
         render_list = []
@@ -471,16 +480,16 @@ class SyntheticDataset(Dataset):
             mask_list.append(mask.reshape(1, 512, 512))
             ero_mask_list.append(ero_mask.reshape(1, 512, 512))
 
-        return {
-            'image': torch.stack(render_list, dim=0),
-            'calib': torch.stack(calib_list, dim=0),
-            'extrinsic': torch.stack(extrinsic_list, dim=0),
-            'depth': torch.stack(depth_list, dim=0),
-            'smpl_normal': torch.stack(smpl_norm_list, dim=0),
-            'normal': torch.stack(normal_list, dim=0),
-            'mask': torch.stack(mask_list, dim=0),
-            'ero_mask': torch.stack(ero_mask_list, dim=0)
-        }
+        data_dict['image'] = torch.stack(render_list, dim=0)
+        data_dict['calib'] = torch.stack(calib_list, dim=0)
+        data_dict['extrinsic'] = torch.stack(extrinsic_list, dim=0)
+        data_dict['depth'] = torch.stack(depth_list, dim=0)
+        data_dict['smpl_normal'] = torch.stack(smpl_norm_list, dim=0)
+        data_dict['normal'] = torch.stack(normal_list, dim=0)
+        data_dict['mask'] = torch.stack(mask_list, dim=0)
+        data_dict['ero_mask'] = torch.stack(ero_mask_list, dim=0)
+
+        return data_dict
 
     def get_item(self, index):
 
@@ -488,23 +497,21 @@ class SyntheticDataset(Dataset):
         frame_id = index // len(self.subjects)
 
         subject_id = self.subjects[subject_id]
-        res = {
+        data_dict = {
             'name': f"Person_{subject_id}",
             'mesh_path': os.path.join(self.OBJ, f"person_{subject_id}", "combined", f'smplx_{str(index).zfill(6)}.obj'),
-            'sid': subject_id,
+            'subject_id': subject_id,
             'phase': self.phase,
+            'frame_id': frame_id,
         }
 
-        render_data = self.load_render_data(frame_id, subject_id)
-        res.update(render_data)
-        norm_parameter = self.get_norm(frame_id, subject_id)
-        res.update(norm_parameter)
+        data_dict = self.load_render_data(data_dict)
+        data_dict = self.get_norm(data_dict)
 
         # start = time.time()
-        sample_data = self.select_sampling_method(frame_id, subject_id, res['b_min'].numpy(), res['b_max'].numpy())
+        data_dict = self.select_sampling_method(data_dict)
         if self.phase != 'test':
-            sample_data = self.visibility_sample(sample_data, res['depth'], res['calib'], res['mask'])
-        res.update(sample_data)
+            data_dict = self.visibility_sample(data_dict)
         # print(f"Time for sampling: {time.time() - start}")
 
         # Warning dirty fix
@@ -513,15 +520,15 @@ class SyntheticDataset(Dataset):
         else:
             mesh = trimesh.load(
                 os.path.join(self.SMPL, f"person_{subject_id}", "smplx", f'smplx_{str(index).zfill(6)}.obj'))
-        res['extrinsic'][0, :, :] = 0
+        data_dict['extrinsic'][0, :, :] = 0
         for i in range(3):
-            res['extrinsic'][0, i, i] = 1
+            data_dict['extrinsic'][0, i, i] = 1
 
         translation = np.zeros((4, 4))
-        translation[:3, 3] = -np.array(res['center']) * res['scale'].numpy()
+        translation[:3, 3] = -np.array(data_dict['center']) * data_dict['scale'].numpy()
         translation[1, 3] += 0.5
         for i in range(3):
-            translation[i, i] = res['scale'].numpy()
+            translation[i, i] = data_dict['scale'].numpy()
         translation[3, 3] = 1
         mesh.apply_transform(translation)
 
@@ -533,14 +540,14 @@ class SyntheticDataset(Dataset):
         mesh.apply_transform(transform)
 
         # rotation
-        direction = res['direction']
+        direction = data_dict['direction']
         x, z = direction[0], direction[2]
         theta = math.acos(z / math.sqrt(z * z + x * x))
         if x < 0:
             theta = 2 * math.acos(-1) - theta
-        res['extrinsic'][0] = torch.FloatTensor(rotationY(-theta))
+        data_dict['extrinsic'][0] = torch.FloatTensor(rotationY(-theta))
         if self.opt.flip_smpl:
-            res['extrinsic'][0] = res['extrinsic'][0] @ torch.FloatTensor(rotationX(math.acos(-1)))
+            data_dict['extrinsic'][0] = data_dict['extrinsic'][0] @ torch.FloatTensor(rotationX(math.acos(-1)))
 
         if self.opt.random_rotation:
             pi = math.acos(-1)
@@ -548,47 +555,35 @@ class SyntheticDataset(Dataset):
             rand_rot = np.array(rotationX(
                 (np.random.rand() - 0.5) * beta)) @ np.array(rotationY(
                     (np.random.rand() - 0.5) * beta)) @ np.array(rotationZ((np.random.rand() - 0.5) * beta))
-            res['extrinsic'][0] = torch.FloatTensor(rand_rot) @ res['extrinsic'][0]
+            data_dict['extrinsic'][0] = torch.FloatTensor(rand_rot) @ data_dict['extrinsic'][0]
 
         rotation = np.zeros((4, 4))
         rotation[3, 3] = 1
-        rotation[:3, :3] = res['extrinsic'][0]
+        rotation[:3, :3] = data_dict['extrinsic'][0]
         mesh.apply_transform(rotation)
 
         transform[1, 3] = 0.5
         mesh.apply_transform(transform)
         vox = mesh.voxelized(pitch=1.0 / 128,
-                            bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
-                            method='binvox',
-                            exact=True)
+                             bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
+                             method='binvox',
+                             binvox_path='./binvox',
+                             exact=True)
         vox.fill()
-        res['vox'] = torch.FloatTensor(vox.matrix).unsqueeze(0)
+        data_dict['vox'] = torch.FloatTensor(vox.matrix.astype(np.float32)).unsqueeze(0)
 
-        if self.opt.debug_data:
-            for num_view_i in range(self.num_views):
-                img = np.uint8((np.transpose(render_data['image'][num_view_i][0:3, :, :].numpy(),
-                                             (1, 2, 0)) * 0.5 + 0.5)[:, :, ::-1] * 255.0)
-                img = np.array(img, dtype=np.uint8).copy()
-                calib = render_data['calib'][num_view_i]
-                pts = torch.FloatTensor(res['samples'][:, res['labels'][0] > 0.5])  # [3, N]
-                # pts = res['samples']
-                # pts = torch.FloatTensor(res['feat_points'])
-                print(pts)
-                pts = perspective(pts.unsqueeze(0), calib.unsqueeze(0)).squeeze(0).transpose(0, 1)
-                for p in pts:
-                    img = cv2.circle(img, (int(p[0]), int(p[1])), 2, (0, 255, 0), -1)
-                cv2.imwrite(f'show/data_set_2d_rendered_{index}_{num_view_i}.jpg', img)
-
-        return res
+        return data_dict
 
     def __getitem__(self, index):
-        return self.get_item(index)
+        start = time.time()
+        res = self.get_item(self.frames[index])
+        res['load_time'] = time.time() - start
+        return res
 
 
 # get options
 opt = parse_config()
 if __name__ == '__main__':
-    import ipdb; ipdb.set_trace()
-    t3_mesh = readobj("/Users/tonywang/Temp/cloth/Obj/person_0/merged/smplx_000000.obj")['vi'][:, :3]
-    # data = SyntheticDataset(opt, phase='train', num_views=4)
-    # print(data[0]['name'])
+    # import ipdb; ipdb.set_trace()
+    # t3_mesh = readobj("/Users/tonywang/Temp/cloth/Obj/person_0/merged/smplx_000000.obj")['vi'][:, :3]
+    SyntheticDataset(opt, phase='train')

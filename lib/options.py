@@ -39,14 +39,14 @@ def parse_config(argv=None):
     parser.add_argument('--b_max', nargs='+', default=[3, 14, 3], type=float)
     parser.add_argument('--smpl_faces', type=str, default='')
 
-    parser.add_argument('--overfitting', action='store_true', help='overfitting on a few frames')
     parser.add_argument('--val_size', type=int, default=10, help='num of validation data to sample')
     
     # Experiment related
     parser.add_argument('--random_multiview', action='store_true', help='Select random multiview combination.')
     parser.add_argument('--cameras', nargs='+', type=int, help='cameras to use')
     parser.add_argument('--persons', nargs='+', type=int, help='persons to use')
-    parser.add_argument('--frames', nargs='+', type=int, help='frames to use')
+    parser.add_argument('--train_frames', nargs='+', type=int, help='frames to use for training')
+    parser.add_argument('--val_frames', nargs='+', type=int, help='frames to use for validation')
 
     # Training related
     parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2, -1 for CPU mode')
@@ -58,7 +58,10 @@ def parse_config(argv=None):
 
     parser.add_argument('--batch_size', type=int, default=2, help='input batch size')
     parser.add_argument('--learning_rate', type=float, default=1e-3, help='adam learning rate')
+    parser.add_argument("--warm_lr", default=1e-4, type=float)
+    parser.add_argument("--final_lr", default=1e-4, type=float)
     parser.add_argument('--num_epoch', type=int, default=1000, help='num epoch to train')
+    parser.add_argument('--warm_lr_epochs', type=int, default=5, help='num epoch to warmup')
 
     parser.add_argument('--val_step', type=int, default=50, help='num of train iterations for validation')
     parser.add_argument('--val_type', type=str, default='mse', help='use mse or p2s as val error, if the latter, mesh will be generated')
