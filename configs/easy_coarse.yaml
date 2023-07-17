@@ -34,7 +34,7 @@ val_frames: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 
 
 # SAMPLING RELATED
 sigma: 0.25 # Pertupation standard deviation for positions
-num_sample_inout: 3000
+num_sample_inout: 4000
 
 
 # network

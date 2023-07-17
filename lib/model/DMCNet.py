@@ -345,7 +345,10 @@ class DMCNet(BaseNet):
         # get the prediction
         res = self.get_preds()
 
+        data['preds'] = res
+
         # get the error
         error = self.get_error()
+        data['loss'] = error
 
-        return res, error
+        return data

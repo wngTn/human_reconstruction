@@ -13,8 +13,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-import argparse
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
@@ -27,21 +25,7 @@ def write_pcd(pcd1pts, pcd2pts, file_name):
 
     pcd1_o3d.paint_uniform_color([1, 0, 0])
     pcd2_o3d.paint_uniform_color([0, 0, 1])
-    # lines_between_pcd = o3d.geometry.LineSet.create_from_point_cloud_correspondences(
-    #     pcd1_o3d, pcd2_o3d, [(i, i) for i in range(len(pcd1_o3d))])
-    # lines_between_pcd.paint_uniform_color([0, 1, 0])
-
-    # visualization of points and line sets
-    # visualizer = o3d.visualization.gui.Application.instance
-    # visualizer.initialize()
-    # test = o3d.visualization.O3DVisualizer(
-    #     "Corresponding point pairs for chamfer distance - pred vs closest points to pred")
-    # test.show_settings = True
     combined_pcd = pcd1_o3d + pcd2_o3d
-    # test.add_geometry('combined_pcd', combined_pcd)
-    # test.add_geometry('lines', lines_between_pcd)
-    # visualizer.add_window(test)
-    # visualizer.run()
 
     # save ply files
     o3d.io.write_point_cloud(file_name, combined_pcd)
@@ -58,14 +42,6 @@ def euler_to_rot_mat(r_x, r_y, r_z):
     R = np.dot(R_z, np.dot(R_y, R_x))
     return R
 
-
-def sort_key(file_path):
-    import re
-    match = re.search(r'_(\d+)_(\d+).obj$', str(file_path))
-    if match:
-        return int(match.group(1)), int(match.group(2))
-    else:
-        return 0, 0
     
 class Evaluator:
 
@@ -81,62 +57,44 @@ class Evaluator:
             save_pcd (bool): TODO 
             folder (str): TODO
         """
-        # assert len(pred_paths) == len(
-        #     gt_paths), f"Number of files in OBJ DIR not equal to TARGET DIR: ({len(pred_paths)} / {len(gt_paths)})"
 
-        self.pred_paths = sorted(list(Path(pred_paths).glob("*.obj")), key=sort_key)
-        self.gt_paths = list(Path(gt_paths).glob("*.obj"))
-        self.human_paths = list(Path(human_paths).glob("*.obj")) if human_paths is not None else None
-        self.cloth_paths = list(Path(cloth_paths).glob("*.obj")) if cloth_paths is not None else None
+        self.pred_paths = pred_paths
+        self.gt_paths = gt_paths
+        self.human_paths = human_paths
+        self.cloth_paths = cloth_paths
 
-        self.pred_objects = self.get_pred_objects
-        self.gt_objects = self.get_gt_objects
-        self.human_objects = self.get_human_objects if human_paths is not None else None
-        self.cloth_objects = self.get_cloth_objects if cloth_paths is not None else None
+        self.pred_objects = self.get_objects(self.pred_paths)
+        self.gt_objects = self.get_objects(self.gt_paths)
+        self.human_objects = self.get_objects(self.human_paths) if human_paths is not None else None
+        self.cloth_objects = self.get_objects(self.cloth_paths) if cloth_paths is not None else None
 
         self.num_samples = num_samples
         self.save_pcd = save_pcd
         self.folder = folder
 
-    @property
-    def get_pred_objects(self):
-        return self._get_pred_objects()
+        self.log_path = os.path.join(self.folder, "metrics.txt")
+        self.log_fout = open(self.log_path, "a")
 
-    def _get_pred_objects(self):
-        for path in self.pred_paths:
-            yield trimesh.load_mesh(path)
-
-    @property
-    def get_gt_objects(self):
-        return self._get_gt_objects()
-
-    def _get_gt_objects(self):
-        for path in self.gt_paths:
-            yield trimesh.load_mesh(path)
+    def _log(self, info_str):
+        self.log_fout.write(info_str + "\n")
+        self.log_fout.flush()
+        print(info_str, flush=True)
 
     @property
-    def get_human_objects(self):
-        return self._get_human_objects()
+    def get_objects(self, paths):
+        return self._get_objects(paths)
 
-    def _get_human_objects(self):
-        for path in self.human_paths:
-            yield trimesh.load_mesh(path)
-
-    @property
-    def get_cloth_objects(self):
-        return self._get_cloth_objects()
-
-    def _get_cloth_objects(self):
-        for path in self.cloth_paths:
+    def _get_pred_objects(self, paths):
+        for path in self.paths:
             yield trimesh.load_mesh(path)
 
     def get_chamfer_distance(self):
-        print(f"{'-' * 6}Evaluating Chamfer Distance{'-' * 6}")
+        self._log(f"{'-' * 6}Evaluating Chamfer Distance{'-' * 6}")
         dist_list = []
         for file_index, (pred_obj, gt_obj) in tqdm(enumerate(zip(self.pred_objects, self.gt_objects)), total=16):
             point_pairs_dict = self.compute_chamfer_dist_with_trimesh(pred_obj, gt_obj)
             dist_list.append(point_pairs_dict["chamfer_distance"])
-            print(f"{file_index}th pair of meshes: chamfer dist = {point_pairs_dict['chamfer_distance']}")
+            self._log(f"{file_index}th pair of meshes: chamfer dist = {point_pairs_dict['chamfer_distance']}")
 
             if self.save_pcd:
                 output_dir = os.path.join(self.folder, "pcd_visualization", "chamfer_distance")
@@ -147,7 +105,7 @@ class Evaluator:
                 )
                 write_pcd(point_pairs_dict["gt_pts"], point_pairs_dict["closest_pts_to_gt"], file_name)
 
-        print(f"Evaluated {len(dist_list)} meshes, the mean chamfer distance is {np.mean(dist_list)}")
+        self._log(f"Evaluated {len(dist_list)} meshes, the mean chamfer distance is {np.mean(dist_list)}")
 
         if self.human_objects is not None and self.cloth_objects is not None:
             dist_list_human = []
@@ -158,7 +116,8 @@ class Evaluator:
                 point_pairs_dict_cloth = self.compute_chamfer_dist_with_trimesh(pred_obj, cloth_obj)
                 dist_list_human.append(point_pairs_dict_human["chamfer_distance"])
                 dist_list_cloth.append(point_pairs_dict_cloth["chamfer_distance"])
-            print(
+
+            self._log(
                 f"Evaluated {min(len(self.pred_paths), len(self.human_paths), len(self.cloth_paths))} meshes, the mean chamfer distance is for human {np.mean(dist_list_human)} and for cloth {np.mean(dist_list_cloth)}"
             )
 
@@ -197,7 +156,7 @@ class Evaluator:
             pred_surf_pts, _ = trimesh.sample.sample_surface(pred_obj, self.num_samples)
             p2s_dist = self.computeP2SDistance(pred_surf_pts, gt_obj)
             p2s_dist_list.append(p2s_dist)
-        print(
+        self._log(
             f"Evaluated {min(len(self.pred_paths), len(self.gt_paths))} meshes, the mean P2S distance is {np.mean(p2s_dist_list)}"
         )
         # return np.mean(p2s_dist_list)
@@ -277,9 +236,9 @@ class Evaluator:
                 save_path = os.path.join(save_demo_img, 'normal_vis_%s.png' % save_name)
                 res_img.save(save_path)
             error_list.append(total_error / side_cnt)
-            print(f"Reprojection normal error for {file_index}th mesh = {total_error / side_cnt}")
+            self._log(f"Reprojection normal error for {file_index}th mesh = {total_error / side_cnt}")
 
-        print(
+        self._log(
             f"Evaluated {min(len(self.pred_paths), len(self.gt_paths))} meshes, the mean reprojection normal error is {np.mean(error_list)}"
         )
 

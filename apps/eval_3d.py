@@ -29,92 +29,96 @@ from lib.data import *
 from lib.model import *
 from lib.geometry import index
 
-from apps.evaluator import *
+from apps.evaluator import Evaluator
 
-import matplotlib
-# matplotlib.use('AGG')
+def compute_metrics(opt):
+    
+    output_dir = os.path.join("outputs", opt.folder)
 
-# get options
-opt = parse_config()
+    val_frames = opt.val_frames
+    pred_paths = []
+    gt_paths = []
+    human_paths = []
+    cloth_paths = []
 
+    for val_frame in val_frames:
+        pred_paths.append(os.path.join(output_dir, "meshes", f"pred_{val_frame:04}.obj"))
+        gt_paths.append(os.path.join(opt.val_dataroot, "Obj", "person_0", "combined", f"smplx_{val_frame:06}.obj"))
+        human_paths.append(os.path.join(opt.val_dataroot, "Obj", "person_0", "smplx_no_cloth", f"smplx_{val_frame:04}.obj"))
+        cloth_paths.append(os.path.join(opt.val_dataroot, "Obj", "person_0", "cloth", f"cloth_{val_frame:04}.obj"))
+
+    evaluator = Evaluator(pred_paths=pred_paths,
+                            gt_paths=opt.gt_paths,
+                            num_samples=5000,
+                            save_pcd=True,
+                            folder=output_dir,
+                            human_paths=human_paths,
+                            cloth_paths=cloth_paths)
+
+    evaluator.get_chamfer_distance()
+
+    
 
 def reconstruct(opt):
 
-    if opt.eval_wo_reconstruct:
-        evaluator = Evaluator(pred_paths=opt.pred_paths,
-                              gt_paths=opt.gt_paths,
-                              num_samples=opt.num_samples_for_eval,
-                              save_pcd=opt.save_pcd_for_eval,
-                              folder=opt.save_pcd_dir,
-                              human_paths=opt.human_paths,
-                              cloth_paths=opt.cloth_paths)
-        evaluator.get_chamfer_distance()
-    else:
-        # set cuda
-        cuda = torch.device('cuda:%s' % opt.gpu_ids[0])
-        netG = DMCNet(opt, projection_mode='perspective').to(device=cuda)
-        netN = NormalNet().to(cuda)
-        print('Using Network: ', netG.name)
-        gpu_ids = [int(i) for i in opt.gpu_ids.split(',')]
-        netG = DataParallel(netG, device_ids=gpu_ids)
-        netN = DataParallel(netN, device_ids=gpu_ids)
-        # load checkpoints
-        if opt.load_netG_checkpoint_path is not None:
-            print('loading for net G ...', opt.load_netG_checkpoint_path)
-            netG.load_state_dict(torch.load(opt.load_netG_checkpoint_path, map_location=cuda), strict=False)
+    netG = DMCNet(opt, projection_mode='perspective').to(device=device)
+    netN = NormalNet().to(device)
+    print('Using Network: ', netG.name)
 
-        if opt.load_netN_checkpoint_path is not None:
-            print('loading for net N ...', opt.load_netN_checkpoint_path)
-            netN.load_state_dict(torch.load(opt.load_netN_checkpoint_path, map_location=cuda), strict=False)
+    netG = DataParallel(netG)
+    netN = DataParallel(netN)
 
-        print("loaded finished!")
+    output_dir = os.path.join("outputs", opt.folder)
+    save_dir = os.path.join(output_dir, 'meshes')
+    
+    # load checkpoints
+    netG_checkpoint_path = os.path.join(output_dir, 'checkpoints', 'netG_latest.pth')
+    print('loading for net G ...', netG_checkpoint_path)
+    netG.load_state_dict(torch.load(netG_checkpoint_path, map_location=device), strict=True)
 
-        test_netG = netG.module
-        netN = netN.module
-        dataset = SyntheticDataset(opt, cache_data=Manager().dict(), cache_data_lock=Lock(), phase='inference')
-        print(dataset.__len__())
+    print('loading for net N ...', opt.load_netN_checkpoint_path)
+    netN.load_state_dict(torch.load(opt.load_netN_checkpoint_path, map_location=device), strict=True)
 
-        os.makedirs(opt.results_path, exist_ok=True)
-        os.makedirs('%s/%s' % (opt.results_path, opt.name), exist_ok=True)
+    print("loaded finished!")
 
-        opt_log = os.path.join(opt.results_path, opt.name, 'opt.json')
-        with open(opt_log, 'w') as outfile:
-            outfile.write(json.dumps(vars(opt), indent=2))
+    test_netG = netG.module
+    netN = netN.module
+    dataset = SyntheticDataset(opt, phase='test')
+    print(f"Test Set Length: dataset.__len__()")
 
-        with torch.no_grad():
-            test_netG.eval()
-            print('Generating mesh...')
-            exp_name = f"{datetime.now().strftime('%m_%d-%H_%M_%S')}"
-            save_dir = f"outputs/reconstruction/{exp_name}"
-            os.makedirs(save_dir, exist_ok=True)
-            # for i in tqdm(range(0, len(dataset))):
-            for i in tqdm(range(16)):
-                test_data = dataset[i]
+    with torch.no_grad():
+        test_netG.eval()
+        print('Generating meshes...')
 
-                save_path = '%s/%s_%d.obj' % (save_dir, test_data['name'], i)
+        for i in tqdm(range(len(dataset))):
+            test_data = dataset[i]
 
-                image_tensor = test_data['image'].to(device=cuda).unsqueeze(0)
-                mask_tensor = test_data['mask'].to(device=cuda).unsqueeze(0)
-                res = netN.forward(image_tensor)
-                res = res * mask_tensor
-                # test_data['normal'] = torch.nn.Upsample(size=[1024, 1024], mode='bilinear')(res[0])
-                test_data['normal'] = res[0]
-                print('Saving to ' + save_path)
-                gen_mesh_dmc(opt, test_netG, cuda, test_data, save_path, threshold=opt.mc_threshold, use_octree=True)
+            save_path = os.path.join(save_dir, f"pred_{str(test_data['frame_id']).zfill(4)}.obj")
 
-            evaluator = Evaluator(pred_paths=save_dir,
-                                  gt_paths=opt.gt_paths,
-                                  num_samples=opt.num_samples_for_eval,
-                                  save_pcd=opt.save_pcd_for_eval,
-                                  folder=opt.save_pcd_dir,
-                                  human_paths=opt.human_paths,
-                                  cloth_paths=opt.cloth_paths)
-            evaluator.get_chamfer_distance()
+            image_tensor = test_data['image'].to(device=device).unsqueeze(0)
+            mask_tensor = test_data['mask'].to(device=device).unsqueeze(0)
+            res = netN.forward(image_tensor)
+            res = res * mask_tensor
+            # test_data['normal'] = torch.nn.Upsample(size=[1024, 1024], mode='bilinear')(res[0])
+            test_data['normal'] = res[0]
+            gen_mesh_dmc(opt, test_netG, device, test_data, save_path, threshold=opt.mc_threshold, use_octree=True)
+
+
+def evaluate(opt):
+    if len(os.listdir(os.path.join("outputs", opt.folder, "meshes"))) < len(opt.val_frames):
+        print("No meshes found. Reconstructing meshes...")
+        reconstruct(opt)
+    compute_metrics(opt)
+
+
+
 
 
 if __name__ == '__main__':
+    device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     np.random.seed(int(time.time()))
     random.seed(int(time.time()))
     torch.manual_seed(int(time.time()))
-
-    reconstruct(opt)
+    # get options
+    opt = parse_config()
+    evaluate(opt)

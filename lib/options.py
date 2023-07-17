@@ -42,7 +42,6 @@ def parse_config(argv=None):
     parser.add_argument('--val_size', type=int, default=10, help='num of validation data to sample')
 
     ## Evaluation related
-    parser.add_argument('--test_dataroot', type=str, required=True, help='path to all test data used for reconstruction')
     parser.add_argument('--eval_wo_reconstruct', action='store_true')
     parser.add_argument('--pred_paths', type=str, help='path to all pred meshes for evaluation')
     parser.add_argument('--gt_paths', type=str, default=None, help='path to all gt meshes for evaluation')
@@ -159,6 +158,9 @@ def parse_config(argv=None):
     # debug
     parser.add_argument('--debug_3d', action='store_true')
     parser.add_argument('--debug_data', action='store_true')
+
+    # evaluation
+    parser.add_argument('--folder', type=str, default=None, help='folder to evaluate')
 
     args, _ = parser.parse_known_args()
 
