@@ -4,6 +4,9 @@ import os
 import random
 import torchvision.transforms as transforms
 from PIL import Image, ImageOps, ImageDraw
+
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+
 import cv2
 import torch
 from PIL.ImageFilter import GaussianBlur, MinFilter
@@ -11,6 +14,7 @@ import trimesh
 from trimesh.voxel import creation
 import math
 import sys
+# import open3d as o3d
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,7 +26,6 @@ from lib.mesh_util import *
 from lib.train_util import find_border
 import time
 
-os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 
 
 class SyntheticDataset(Dataset):
@@ -34,7 +37,8 @@ class SyntheticDataset(Dataset):
         self.is_train = (phase == 'train')
 
         # Path setup
-        self.root = opt.train_dataroot
+        # self.root = opt.train_dataroot if phase == 'train' else opt.val_dataroot
+        self.root = opt.train_dataroot if phase == 'train' else (opt.val_dataroot if phase == 'val' else opt.test_dataroot)
         self.RENDER = os.path.join(self.root, 'RGB')
         self.PARAM = os.path.join(self.root, 'output_data.npz')
         self.OBJ = os.path.join(self.root, 'Obj')
@@ -54,7 +58,7 @@ class SyntheticDataset(Dataset):
 
         self.load_size = self.opt.loadSize
 
-        self.cameras = self.opt.cameras
+        self.cameras = self.opt.cameras if self.phase == 'train' else opt.val_cameras
         self.num_views = len(self.cameras)
         self.subjects = self.opt.persons
         self.frames = self.opt.frames
@@ -206,28 +210,100 @@ class SyntheticDataset(Dataset):
         # print(person_id, self.cache_data.__len__())
         root_dir = self.OBJ
         # if self.is_train:
+        a = 0
         if self.is_train:
-            mesh = trimesh.load(
-                os.path.join(root_dir, f"person_{person_id}", "combined", f'smplx_{str(frame_id).zfill(6)}.obj'))
+            smpl_mesh = trimesh.load(
+                os.path.join(root_dir, f"person_{person_id}", "smplx", f'smplx_{str(frame_id).zfill(6)}.obj'))
+            try:
+                cloth_mesh = trimesh.load(
+                    os.path.join(root_dir, f"person_{person_id}", "cloth", f'cloth_{str(frame_id + 1).zfill(6)}.obj'))
+            except:
+                a = True
             if self.opt.coarse_part:
                 radius_list = [self.opt.sigma, self.opt.sigma * 2, self.opt.sigma * 4]
             else:
                 radius_list = [self.opt.sigma / 3, self.opt.sigma, self.opt.sigma * 2]
+            # surface_points = np.zeros((6 * self.num_sample_inout, 3))
+            # sample_points = np.zeros((6 * self.num_sample_inout, 3))
+            # for i in range(3):
+            #     d = 2 * self.num_sample_inout
+            #     surface_points[i * d:(i + 1) * d, :], _ = trimesh.sample.sample_surface(mesh, 2 * self.num_sample_inout)
+            #     sample_points[i * d:(i + 1) * d, :] = surface_points[i * d:(i + 1) * d, :] + np.random.normal(
+            #         scale=radius_list[i], size=(2 * self.num_sample_inout, 3))
+
+            # num_sample_points_cloth = self.num_sample_inout // 4
+            # num_sample_points_smpl = self.num_sample_inout - num_sample_points_cloth
+
             surface_points = np.zeros((6 * self.num_sample_inout, 3))
             sample_points = np.zeros((6 * self.num_sample_inout, 3))
             for i in range(3):
                 d = 2 * self.num_sample_inout
-                surface_points[i * d:(i + 1) * d, :], _ = trimesh.sample.sample_surface(mesh, 2 * self.num_sample_inout)
+                # if i < 1:
+                surface_points[i * d:(i + 1) * d, :], _ = trimesh.sample.sample_surface(smpl_mesh, 2 * self.num_sample_inout)
                 sample_points[i * d:(i + 1) * d, :] = surface_points[i * d:(i + 1) * d, :] + np.random.normal(
                     scale=radius_list[i], size=(2 * self.num_sample_inout, 3))
+                # else:
+                # surface_points[i * d:(i + 1) * d, :], _ = trimesh.sample.sample_surface(cloth_mesh, 2 * self.num_sample_inout)
+                # sample_points[i * d:(i + 1) * d, :] = surface_points[i * d:(i + 1) * d, :] + np.random.normal(
+                                                                # scale=radius_list[i], size=(2 * self.num_sample_inout, 3))
+            
+            # inside_smpl = smpl_mesh.contains(sample_points)
+            if not a:
+                cloth_random_vertices = np.array(cloth_mesh.vertices[np.random.choice(len(cloth_mesh.vertices), 1000)])
+                inside_cloth = np.ones(shape=(1000,), dtype=bool)
+            else:
+                cloth_random_vertices = np.array(smpl_mesh.vertices[np.random.choice(len(smpl_mesh.vertices), 1000)])
+                inside_cloth = np.ones(shape=(1000,), dtype=bool)
+
+            # surface_points = np.concatenate([surface_points, cloth_random_vertices], 0)
+            # sample_points = np.concatenate([sample_points, cloth_random_vertices], 0)
+
+            ## Visualization of surface points and sample points
+            # test = o3d.visualization.gui.Application.instance
+            # test.initialize()
+            # Heart = o3d.visualization.O3DVisualizer("cloth_sample_pts_test", 1024, 768)
+            # Heart.show_settings = True
+            # pcd = o3d.geometry.PointCloud()
+            # pcd.points = o3d.utility.Vector3dVector(surface_points)
+            # sampled = o3d.geometry.PointCloud()
+            # sampled.points = o3d.utility.Vector3dVector(sample_points)
+            # Heart.add_geometry("pcd", pcd)
+            # Heart.add_geometry("sampled", sampled)
+            # test.add_window(Heart)
+            # test.run()
+
+            # # Sample points from the smpl mesh surface and add perturbations
+            # surface_points, sample_points = zip(*[(
+            #     points := trimesh.sample.sample_surface(smpl_mesh, num_sample_points_smpl * 2)[0],
+            #       points + np.random.normal(scale=radius, size=(num_sample_points_smpl * 2, 3))) for radius in radius_list])
+            # # Flatten the arrays and add some completely random points
+            # surface_points = np.vstack(surface_points)
+            # sample_points = np.vstack(
+            #     list(sample_points) + [np.random.rand(num_sample_points_smpl, 3)])
+            # # Filter the points that are inside the mesh
+            # inner_points = sample_points[smpl_mesh.contains(sample_points)]
+            # # Sample 1000 points from the cloth object
+            # random_points_vert = np.random.choice(cloth_mesh.vertices.shape[0], 1000, replace=False)
+            # random_points_cloth = cloth_mesh.vertices[random_points_vert, :]
+            # # Create a point cloud from the inside points and the cloth points
+            # pcd = trimesh.geometry.PointCloud()
+            # pcd.points = trimesh.utility.Vector3dVector(np.vstack((inner_points, random_points_cloth)))
 
             # add random points within image space
             length = b_max - b_min
             random_points = np.random.rand(self.num_sample_inout, 3) * length + b_min
             sample_points = np.concatenate([sample_points, random_points], 0)
-            inside = mesh.contains(sample_points)
+            # inside = cloth_mesh.contains(sample_points)     # inside = np.logical_or(smpl_mesh.contains(sample_points), cloth_mesh.contains(sample_points))
+            inside = smpl_mesh.contains(sample_points)
 
-            del mesh
+            # if not a:
+            sample_points = np.concatenate([sample_points, cloth_random_vertices])
+            inside = np.concatenate([inside, inside_cloth], 0)
+
+            del smpl_mesh
+            if not a:
+                del cloth_mesh
+
         else:
             sample_points = torch.zeros(1)
             surface_points = torch.zeros(1)
@@ -253,7 +329,7 @@ class SyntheticDataset(Dataset):
         center = torch.zeros(3).float()
 
         t3_mesh = readobj(
-            os.path.join(self.OBJ, f"person_{person_id}", "combined",
+            os.path.join(self.OBJ, f"person_{person_id}", "smplx",
                          f'smplx_{str(frame_id).zfill(6)}.obj'))['vi'][:, :3]
         b0 = np.min(t3_mesh, axis=0)
         b1 = np.max(t3_mesh, axis=0)
@@ -559,9 +635,10 @@ class SyntheticDataset(Dataset):
         transform[1, 3] = 0.5
         mesh.apply_transform(transform)
         vox = mesh.voxelized(pitch=1.0 / 128,
-                            bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
-                            method='binvox',
-                            exact=True)
+                             bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
+                             method='binvox',
+                             exact=True)
+        
         vox.fill()
         res['vox'] = torch.FloatTensor(vox.matrix).unsqueeze(0)
 
@@ -583,7 +660,7 @@ class SyntheticDataset(Dataset):
         return res
 
     def __getitem__(self, index):
-        return self.get_item(index)
+        return self.get_item(self.frames[index])
 
 
 # get options
