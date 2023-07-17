@@ -1,0 +1,57 @@
+name: easy_overfitting_fine
+
+fine_part: True
+infer: False
+
+# TRAINING PARAMETERS
+gpu_ids: 0
+num_threads: 3
+batch_size: 1
+serial_batches: False
+pin_memory: True
+learning_rate: 1e-3
+num_epoch: 64
+
+val_size: 5
+val_type: "notmse"
+
+# DATASET PATH
+train_dataroot: data/Synthetic/easy
+val_dataroot: data/Synthetic/easy
+smpl_faces: lib/data/smplx_multi.obj
+smpl_path: Obj
+obj_path: Obj
+loadSize: 512
+
+# DATASET PARAMETERS
+cameras: [0, 5, 11, 17, 23] # [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29]
+random_multiview: False
+persons: [0]
+train_frames: [0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 78, 84, 90, 96, 102, 108, 114, 120, 126, 132, 138, 144, 150, 156, 162]
+val_frames: [3, 9, 15, 21, 27, 33, 39, 45, 51, 57, 63, 69, 75, 81, 87, 93, 99, 105, 111, 117, 123, 129, 135, 141, 147, 153, 159, 165]
+
+# preserve_single: True
+
+# SAMPLING REALTED
+sigma: 0.25 # Pertupation standard deviation for positions
+num_sample_inout: 8000
+
+
+# network
+mlp_dim: [323, 1024, 512, 256, 128, 1]
+fine_mlp_dim: [355, 512, 256, 128, 1]
+
+# PLOTTING PARAMETERS
+freq_plot: 10 
+freq_save: 50
+freq_save_ply: 50
+freq_val: 10 # Epochs
+
+# PATHS
+load_netN_checkpoint_path: checkpoints/demo/netN_latest
+load_netG_checkpoint_path: outputs/easy_overfitting_coarse/checkpoints/netG_latest
+
+resolution: 512
+mc_threshold: 0.5
+
+# PATHS

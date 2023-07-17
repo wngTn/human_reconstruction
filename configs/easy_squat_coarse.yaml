@@ -1,0 +1,54 @@
+# Overfits with ground truth data
+name: easy_squat_coarse
+
+coarse_part: True
+infer: False
+
+# TRAINING PARAMETERS
+gpu_ids: 0
+num_threads: 2
+batch_size: 1
+serial_batches: False
+pin_memory: False
+learning_rate: 1e-3
+num_epoch: 64
+
+val_size: 5
+val_type: "notmse"
+
+# DATASET PATH
+train_dataroot: data/Synthetic/easy
+val_dataroot: data/Synthetic/easy
+smpl_path: Obj
+obj_path: Obj
+loadSize: 512
+
+# DATASET PARAMETERS
+cameras: [0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29]
+random_multiview: False
+persons: [0]
+train_frames: [50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 106, 108]
+val_frames: [51, 53, 55, 57, 59, 61, 63, 65, 67, 69, 71, 73, 75, 77, 79, 81, 83, 85, 87, 89, 91, 93, 95, 97, 99, 101, 103, 105, 107, 109, 110]
+
+# preserve_single: True
+
+# SAMPLING REALTED
+sigma: 0.25 # Pertupation standard deviation for positions
+num_sample_inout: 4000
+
+
+# network
+mlp_dim: [323, 1024, 512, 256, 128, 1]
+fine_mlp_dim: [355, 512, 256, 128, 1]
+
+# PLOTTING PARAMETERS
+freq_plot: 10 
+freq_save: 50
+freq_save_ply: 50
+freq_val: 5 # Epochs
+
+# PATHS
+load_netN_checkpoint_path: checkpoints/demo/netN_latest
+
+resolution: 512
+mc_threshold: 0.5

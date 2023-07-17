@@ -28,9 +28,9 @@ def parse_config(argv=None):
     parser.add_argument('--name', type=str, default='deepmulticap', help='name of a model/experiment.')
     
     # Datasets related
-    parser.add_argument('--train_dataroot', type=str, required=True,
+    parser.add_argument('--train_dataroot', type=str, 
                         help='path to all train data')
-    parser.add_argument('--val_dataroot', type=str, required=True, help='path to all val data')
+    parser.add_argument('--val_dataroot', type=str, help='path to all val data')
     parser.add_argument('--obj_path', type=str)
     parser.add_argument('--smpl_path', type=str)
     parser.add_argument('--tex_path', type=str)
@@ -40,10 +40,22 @@ def parse_config(argv=None):
     parser.add_argument('--smpl_faces', type=str, default='')
 
     parser.add_argument('--val_size', type=int, default=10, help='num of validation data to sample')
-    
+
+    ## Evaluation related
+    parser.add_argument('--test_dataroot', type=str, required=True, help='path to all test data used for reconstruction')
+    parser.add_argument('--eval_wo_reconstruct', action='store_true')
+    parser.add_argument('--pred_paths', type=str, help='path to all pred meshes for evaluation')
+    parser.add_argument('--gt_paths', type=str, default=None, help='path to all gt meshes for evaluation')
+    parser.add_argument('--human_paths', type=str, default=None, help='Evaluate separately for human body and clothes')
+    parser.add_argument('--cloth_paths', type=str, default=None, help='Evaluate separately for human body and clothes')
+    parser.add_argument('--num_samples_for_eval', type=int, default=10000, help='path to all gt meshes for evaluation')
+    parser.add_argument('--save_pcd_for_eval', action='store_true')
+    parser.add_argument('--save_pcd_dir', type=str, default=None, help='where to save the pcd visualization for chamfer dist')
+
     # Experiment related
     parser.add_argument('--random_multiview', action='store_true', help='Select random multiview combination.')
     parser.add_argument('--cameras', nargs='+', type=int, help='cameras to use')
+    parser.add_argument('--val_cameras', nargs='+', type=int, help='cameras to use in validation')
     parser.add_argument('--persons', nargs='+', type=int, help='persons to use')
     parser.add_argument('--train_frames', nargs='+', type=int, help='frames to use for training')
     parser.add_argument('--val_frames', nargs='+', type=int, help='frames to use for validation')
