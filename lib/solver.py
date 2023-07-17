@@ -29,12 +29,14 @@ VAL_REPORT_TEMPLATE = """
 [val]   chamfer_dist: {chamfer_dist}
 """
 
+
 class Solver():
+
     def __init__(self, netN, netG, opt, train_dataloader, val_dataloader, optimizer, device):
 
-        self.epoch = 0                    # set in __call__
+        self.epoch = 0  # set in __call__
         self.opt = opt
-        self.netN = netN 
+        self.netN = netN
         self.netG = netG
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
@@ -43,26 +45,16 @@ class Solver():
         self.output_dir = os.path.join("outputs", opt.exp_name)
         self.device = device
 
-        self.best = {
-            "epoch": 0,
-            "loss": float("inf"),
-            "chamfer_dist": float("inf")
-        }
+        self.best = {"epoch": 0, "loss": float("inf"), "chamfer_dist": float("inf")}
 
         # init log
         # contains all necessary info for all phases
-        self.log = {
-            "train": {},
-            "val": {}
-        }
+        self.log = {"train": {}, "val": {}}
 
         # tensorboard
-        os.makedirs(train_tb_out:=os.path.join(self.output_dir, "tensorboard", "train"), exist_ok=True)
-        os.makedirs(val_tb_out:=os.path.join(self.output_dir, "tensorboard","val"), exist_ok=True)
-        self._log_writer = {
-            "train": SummaryWriter(train_tb_out),
-            "val": SummaryWriter(val_tb_out)
-        }
+        os.makedirs(train_tb_out := os.path.join(self.output_dir, "tensorboard", "train"), exist_ok=True)
+        os.makedirs(val_tb_out := os.path.join(self.output_dir, "tensorboard", "val"), exist_ok=True)
+        self._log_writer = {"train": SummaryWriter(train_tb_out), "val": SummaryWriter(val_tb_out)}
 
         # training log
         log_path = os.path.join(self.output_dir, "log.txt")
@@ -75,14 +67,13 @@ class Solver():
         # only for internal access and temporary results
         self._running_log = {}
         self._global_iter_id = 0
-        self._total_iter = {}             # set in __call__
+        self._total_iter = {}  # set in __call__
 
         # templates
-        self.__iter_report_template = ITER_REPORT_TEMPLATE 
+        self.__iter_report_template = ITER_REPORT_TEMPLATE
         self.__val_report_template = VAL_REPORT_TEMPLATE
 
         self.lr_scheduler = CosineAnnealingLR(optimizer, T_max=opt.num_epoch, eta_min=0.000001)
-
 
     def __call__(self, epoch):
         # setting
@@ -94,16 +85,16 @@ class Solver():
             self._log("epoch {} starting...".format(epoch_id + 1))
 
             if (epoch_id + 1) % self.opt.freq_val == 0 and epoch_id > 0:
-                self._eval_feed(self.val_dataloader, epoch_id)
-            
-            # feed 
+                with torch.no_grad():
+                    self._eval_feed(self.val_dataloader, epoch_id)
+
+            # feed
             self._train_feed(self.train_dataloader, epoch_id)
 
             # update lr scheduler
             if self.lr_scheduler:
                 print("update learning rate --> {}\n".format(set(self.lr_scheduler.get_lr())))
                 self.lr_scheduler.step()
-                
 
     def _log(self, info_str):
         self.log_fout.write(info_str + "\n")
@@ -165,8 +156,7 @@ class Solver():
                 "chamfer_dist": 0,
             }
             # forward
-            with torch.no_grad():
-                data_dict = self._forward(data_dict)
+            data_dict = self._forward(data_dict)
             frame_id = data_dict['frame_id'][0]
             ply_save_path = os.path.join(self.opt.val_results_path, f"{epoch_id}__frame_{frame_id}.ply")
             r = data_dict["preds"].cpu()
@@ -182,9 +172,9 @@ class Solver():
             except:
                 pass
 
-            self._running_log["loss"] = data_dict["loss"] 
-            self._running_log["chamfer_dist"] = 0 
-            
+            self._running_log["loss"] = data_dict["loss"]
+            self._running_log["chamfer_dist"] = 0
+
             # record log
             self.log["val"]["loss"].append(self._running_log["loss"].item())
             self.log["val"]["chamfer_dist"].append(self._running_log["chamfer_dist"])
@@ -239,7 +229,7 @@ class Solver():
             start = time.time()
             self._backward()
             self.log["train"]["backward"].append(time.time() - start)
-            
+
             # record log
             self.log["train"]["loss"].append(self._running_log["loss"].item())
 
@@ -273,7 +263,6 @@ class Solver():
         )
         self._log_eval(val_report)
 
-
     def _train_report(self, epoch_id):
         # compute ETA
         fetch_time = self.log["train"]["fetch"]
@@ -288,40 +277,32 @@ class Solver():
         eta = decode_eta(eta_sec)
 
         # print report
-        iter_report = self.__iter_report_template.format(
-            epoch_id=epoch_id + 1,
-            iter_id=self._global_iter_id + 1,
-            total_iter=self._total_iter["train"],
-            train_loss=round(np.mean([v for v in self.log["train"]["loss"]]), 5),
-            lr=round(self.optimizer.param_groups[0]["lr"], 5),
-            mean_fetch_time=round(np.mean(fetch_time), 5),
-            mean_forward_time=round(np.mean(forward_time), 5),
-            mean_backward_time=round(np.mean(backward_time), 5),
-            mean_iter_time=round(np.mean(iter_time), 5),
-            eta_h=eta["h"],
-            eta_m=eta["m"],
-            eta_s=eta["s"],
-            data_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        )
+        iter_report = self.__iter_report_template.format(epoch_id=epoch_id + 1,
+                                                         iter_id=self._global_iter_id + 1,
+                                                         total_iter=self._total_iter["train"],
+                                                         train_loss=round(
+                                                             np.mean([v for v in self.log["train"]["loss"]]), 5),
+                                                         lr=round(self.optimizer.param_groups[0]["lr"], 5),
+                                                         mean_fetch_time=round(np.mean(fetch_time), 5),
+                                                         mean_forward_time=round(np.mean(forward_time), 5),
+                                                         mean_backward_time=round(np.mean(backward_time), 5),
+                                                         mean_iter_time=round(np.mean(iter_time), 5),
+                                                         eta_h=eta["h"],
+                                                         eta_m=eta["m"],
+                                                         eta_s=eta["s"],
+                                                         data_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self._log(iter_report)
 
     def _dump_log(self, phase):
         if phase == "train":
-            log = {
-                "loss": ["loss"]
-            }
+            log = {"loss": ["loss"]}
         elif phase == "val":
-            log = {
-                "loss": ["loss"],
-                "metrics": ["chamfer_dist"]
-            }
+            log = {"loss": ["loss"], "metrics": ["chamfer_dist"]}
         for key in log:
             for item in log[key]:
-                self._log_writer[phase].add_scalar(
-                    "{}/{}".format(key, item),
-                    np.mean([v for v in self.log[phase][item]]),
-                    self._global_iter_id
-                )
+                self._log_writer[phase].add_scalar("{}/{}".format(key, item),
+                                                   np.mean([v for v in self.log[phase][item]]), self._global_iter_id)
+
 
 def decode_eta(eta_sec):
     eta = {'h': 0, 'm': 0, 's': 0}
