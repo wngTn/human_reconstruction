@@ -235,35 +235,45 @@ python3 -m pip install pyrender
 python setup.py develop
 ```
 
+Specify your dataset:
+```
+exp_data=<>
+```
+
 Convert Dataset into easymocap format (extri and intri still bugged):
 ```
-python scripts/convert_params.py -i data/Synthetic/first_trial/camera_info.json -o data/Synthetic/first_trial_easymocap -d data/Synthetic/first_trial -f 30
+python scripts/convert_params.py -i "../../$exp_data/scene_camera.json" -o "../../${exp_data}_easymocap" -d "../../${exp_data}/RGB" -f 30 -n 30
 ```
 
 Extract the images from videos:
 ```
-data=/path/to/data
-python scripts/preprocess/extract_video.py ${data} --no2d
+python scripts/preprocess/extract_video.py "../../${exp_data}_easymocap" --no2d
 ```
 
 Create 2D keypoints:
 ```
-python apps/preprocess/extract_keypoints.py ${data} --mode yolo-hrnet
+python apps/preprocess/extract_keypoints.py "../../${exp_data}_easymocap" --mode yolo-hrnet
 ```
 
 Create 3D keypoints:
 ```
-python3 apps/demo/mvmp.py ${data} --out ${data}/output --annot annots --cfg config/exp/mvmp1f.yml --undis --vis_det --vis_repro
+python3 apps/demo/mvmp.py "../../${exp_data}_easymocap" --out "../../${exp_data}_easymocap/output" --annot annots --cfg config/exp/mvmp1f.yml --undis --vis_det --vis_repro
 ```
 
 Track 3D keypoints:
 ```
-python3 apps/demo/auto_track.py ${data}/output ${data}/output-track --track3d
+python3 apps/demo/auto_track.py "../../${exp_data}_easymocap/output" "../../${exp_data}_easymocap/output-track" --track3d
 ```
 
 Fit SMPL model:
 ```
-python3 apps/demo/smpl_from_keypoints.py ${data} --skel ${data}/output-track/keypoints3d --out ${data}/output-track/smpl --verbose --opts smooth_poses 1e1
+python3 apps/demo/smpl_from_keypoints.py "../../${exp_data}_easymocap" --skel "../../${exp_data}_easymocap/output-track/keypoints3d" --out "../../${exp_data}_easymocap/output-track/smpl" --verbose --opts smooth_poses 1e1
+```
+
+Post Processing:
+
+```
+python3 post_process_smpl.py --input_dir "../../${exp_data}_easymocap/output-track/smpl" --output_dir "../../${exp_data}/smpl_pred/person_0/smplx"
 ```
 
 
