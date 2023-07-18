@@ -17,9 +17,8 @@ val_size: 5
 val_type: "notmse"
 
 # DATASET PATH
-train_dataroot: data/Synthetic/easy
-val_dataroot: data/Synthetic/easy
-smpl_faces: lib/data/smplx_multi.obj
+train_dataroot: data/Synthetic/first_trial
+val_dataroot: data/Synthetic/first_trial
 smpl_path: Obj
 obj_path: Obj
 loadSize: 512
