@@ -1,5 +1,6 @@
 import sys
 import os
+from glob import glob
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -72,7 +73,7 @@ def reconstruct(opt):
     save_dir = os.path.join(output_dir, 'meshes')
     
     # load checkpoints
-    netG_checkpoint_path = os.path.join(output_dir, 'checkpoints', 'netG_latest.pth')
+    netG_checkpoint_path = os.path.join(output_dir, 'checkpoints', 'netG_latest')
     print('loading for net G ...', netG_checkpoint_path)
     netG.load_state_dict(torch.load(netG_checkpoint_path, map_location=device), strict=True)
 
@@ -84,7 +85,7 @@ def reconstruct(opt):
     test_netG = netG.module
     netN = netN.module
     dataset = SyntheticDataset(opt, phase='test')
-    print(f"Test Set Length: dataset.__len__()")
+    print(f"Test Set Length: {dataset.__len__()}")
 
     with torch.no_grad():
         test_netG.eval()
@@ -105,7 +106,8 @@ def reconstruct(opt):
 
 
 def evaluate(opt):
-    if len(os.listdir(os.path.join("outputs", opt.folder, "meshes"))) < len(opt.val_frames):
+    os.makedirs(os.path.join("outputs", opt.folder, "meshes"), exist_ok=True)
+    if len(glob(os.path.join("outputs", opt.folder, "meshes", "*.obj"))) < len(opt.val_frames):
         print("No meshes found. Reconstructing meshes...")
         reconstruct(opt)
     compute_metrics(opt)

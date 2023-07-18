@@ -5,6 +5,7 @@ from PIL import Image
 import torch.nn.functional as F
 import trimesh
 import os
+import open3d as o3d
 
 from .sdf import create_grid, eval_grid_octree, eval_grid
 from .net_util import reshape_sample_tensor
@@ -113,8 +114,9 @@ def gen_mesh_dmc(opt, net, cuda, data, save_path, use_octree=True, threshold=0.5
     Image.fromarray(np.uint8(save_img[:,:,::-1])).save(save_img_path)
 
     try:
+        point_cloud_save_path = save_path[:-4] + '.ply'
         verts, faces, _, _ = reconstruction_3d(
-            net, cuda, calib_tensor.unsqueeze(0), extrinsic, opt.resolution, b_min, b_max, use_octree=use_octree, threshold=threshold)
+            net, cuda, calib_tensor.unsqueeze(0), extrinsic, opt.resolution, b_min, b_max, point_cloud_save_path,use_octree=use_octree, threshold=threshold)
         verts_tensor = torch.from_numpy(verts.T).unsqueeze(0).to(device=cuda).float()
         xyz_tensor = net.projection(verts_tensor, calib_tensor[:1])
         uv = xyz_tensor[:, :2, :]
@@ -124,9 +126,44 @@ def gen_mesh_dmc(opt, net, cuda, data, save_path, use_octree=True, threshold=0.5
     except Exception as e:
         print("Yo, something went wrong", e)
 
+def grid_to_point_cloud(sdf):
+    # Asserting the shape of the sdf
+    assert sdf.shape == (512, 512, 512)
+
+    # Generate a grid of coordinates
+    x, y, z = np.meshgrid(np.arange(sdf.shape[0]), 
+                          np.arange(sdf.shape[1]), 
+                          np.arange(sdf.shape[2]), 
+                          indexing='ij')
+
+    # Flatten the coordinate grids and the sdf to 1D arrays
+    x = x.flatten()
+    y = y.flatten()
+    z = z.flatten()
+    sdf_flat = sdf.flatten()
+
+    # Each grid cell corresponds to a point in the point cloud
+    points = np.column_stack((x, y, z))
+
+    # The color is a linear blend of green and red based on the sdf value
+    red = sdf_flat
+    green = 1.0 - sdf_flat
+
+    # Colors in open3d are in the range [0, 1], so we need to scale them
+    colors = np.column_stack((red, green, np.zeros_like(red)))  # No blue component
+
+    # Create a PointCloud object
+    pcd = o3d.geometry.PointCloud()
+
+    # Assign the points and colors to the point cloud
+    pcd.points = o3d.utility.Vector3dVector(points)
+    pcd.colors = o3d.utility.Vector3dVector(colors)
+
+    return pcd
+
 
 def reconstruction_3d(net, cuda, calib_tensor, extrinsic, 
-                   resolution, b_min, b_max,
+                   resolution, b_min, b_max, pcd_save_path,
                    net_3d=False, use_octree=False, num_samples=30000, threshold=0.5, transform=None):
     '''
     Reconstruct meshes from sdf predicted by the network.
@@ -164,6 +201,8 @@ def reconstruction_3d(net, cuda, calib_tensor, extrinsic,
     # Finally we do marching cubes
     #try:
     print("The highest probability for SDF was,", sdf.max())
+    point_cloud = grid_to_point_cloud(sdf)
+    o3d.io.write_point_cloud(pcd_save_path, point_cloud)
     verts, faces, normals, values = measure._marching_cubes_lewiner.marching_cubes(sdf, threshold)
     # transform verts into world coordinate system
     verts = np.matmul(mat[:3, :3], verts.T) + mat[:3, 3:4]

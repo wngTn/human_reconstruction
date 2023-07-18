@@ -44,8 +44,6 @@ class SyntheticDataset(Dataset):
         self.SMPL_NORMAL = os.path.join(self.root, 'smpl_pos')
         self.MASK = os.path.join(self.root, 'Segmentation')
 
-        if opt.obj_path is not None:
-            self.OBJ = os.path.join(self.root, opt.obj_path)
         if opt.smpl_path is not None:
             self.SMPL = os.path.join(self.root, opt.smpl_path)
 
@@ -516,7 +514,7 @@ class SyntheticDataset(Dataset):
 
         # Warning dirty fix
         if self.SMPL.endswith('_pred'):
-            mesh = trimesh.load(os.path.join(self.SMPL, f'smpl_{str(index).zfill(6)}.obj'))
+            mesh = trimesh.load(os.path.join(self.SMPL, f"person_{subject_id}", "smplx", f'smpl_{str(index).zfill(6)}.obj'))
         else:
             mesh = trimesh.load(
                 os.path.join(self.SMPL, f"person_{subject_id}", "smplx", f'smplx_{str(index).zfill(6)}.obj'))
@@ -564,13 +562,17 @@ class SyntheticDataset(Dataset):
 
         transform[1, 3] = 0.5
         mesh.apply_transform(transform)
-        vox = mesh.voxelized(pitch=1.0 / 128,
-                             bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
-                             method='binvox',
-                             binvox_path='./binvox',
-                             exact=True)
-        vox.fill()
-        data_dict['vox'] = torch.FloatTensor(vox.matrix.astype(np.float32)).unsqueeze(0)
+
+        # vox = mesh.voxelized(pitch=1.0 / 128,
+        #                      bounds=np.array([[-0.5, 0, -0.5], [0.5, 1, 0.5]]),
+        #                      method='binvox',
+        #                      binvox_path='./binvox',
+        #                      exact=True)
+        # vox.fill()
+        # data_dict['vox'] = torch.FloatTensor(vox.matrix.astype(np.float32)).unsqueeze(0)
+
+        vox = np.load(os.path.join(self.root, 'Obj', 'person_0', 'voxel_grid', f'voxel_grid_{str(frame_id).zfill(6)}.npy'))
+        data_dict['vox'] = torch.FloatTensor(vox).unsqueeze(0)
 
         return data_dict
 
@@ -582,8 +584,16 @@ class SyntheticDataset(Dataset):
 
 
 # get options
-opt = parse_config()
+
 if __name__ == '__main__':
     # import ipdb; ipdb.set_trace()
     # t3_mesh = readobj("/Users/tonywang/Temp/cloth/Obj/person_0/merged/smplx_000000.obj")['vi'][:, :3]
-    SyntheticDataset(opt, phase='train')
+    opt = parse_config()
+    opt.train_frames = list(range(0, 536))
+    data = SyntheticDataset(opt, phase='train')
+
+    for item in data:
+        frame_id = item['frame_id']
+        voxel_grid = item['vox'].squeeze(0).numpy()
+
+        np.save(f"data/Synthetic/easy/smpl_pred/person_0/voxel_grid/voxel_grid_{frame_id:06}.npy", voxel_grid)
