@@ -28,8 +28,11 @@ def smpl_normalize(smpl, norm_faces, flip_normal=False, init_rot=None):
 
     normal = np.zeros((3))
     for f in norm_faces:
-        a, b, c = vi[f[0]][0], vi[f[1]][0], vi[f[2]][0]
-        normal += cross_3d(c - a, b - a)
+        try:
+            a, b, c = vi[f[0]][0], vi[f[1]][0], vi[f[2]][0]
+            normal += cross_3d(c - a, b - a)
+        except:
+            pass
     if flip_normal:
         normal = -normal
     

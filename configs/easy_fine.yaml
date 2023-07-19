@@ -1,7 +1,7 @@
 # Overfits with ground truth data
-name: easy_coarse
+name: easy_fine
 
-coarse_part: True
+fine_part: True
 infer: False
 
 # TRAINING PARAMETERS
@@ -11,7 +11,7 @@ batch_size: 1
 serial_batches: False
 pin_memory: False
 learning_rate: 1e-3
-num_epoch: 64
+num_epoch: 20
 
 val_size: 5
 val_type: "notmse"
@@ -34,7 +34,7 @@ val_frames: [17, 23, 27, 33, 37, 53, 57, 71, 75, 85, 89, 93, 95, 99, 103, 113, 1
 
 # SAMPLING RELATED
 sigma: 0.25 # Pertupation standard deviation for positions
-num_sample_inout: 4000
+num_sample_inout: 3000
 
 
 # network
@@ -49,6 +49,7 @@ freq_val: 5 # Epochs
 
 # PATHS
 load_netN_checkpoint_path: checkpoints/demo/netN_latest
+load_netG_checkpoint_path: /home/hyunjun/tony/at3dcv_project/outputs/07_19-01_22_15_EASY_COARSE/checkpoints/netG_latest
 
 resolution: 512
 mc_threshold: 0.5

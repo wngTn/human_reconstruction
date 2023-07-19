@@ -14,7 +14,7 @@ from lib.mesh_util import *
 
 def read_norm_smpl(path, smpl_faces, flip_normal=False, init_rot=None):
     obj = t3.readobj(path, scale=1)
-    faces = t3.readobj(smpl_faces)['f']
+    faces = obj['f']
     o_vi = obj['vi'].copy()
     norm_vi = smpl_normalize(obj, faces, flip_normal, init_rot)['smpl']
     obj['vi'] = norm_vi
