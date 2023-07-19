@@ -8,7 +8,7 @@ We use the provided code of the authors (https://github.com/DSaurus/DeepMultiCap
 As their code base is incomprehensive we additionally implement remaining code and also adapt their code to our synthetic dataset.
 
 ## Requirements
-- [PyTorch](https://pytorch.org/)
+- torch
 - torchvision
 - trimesh
 - numpy
