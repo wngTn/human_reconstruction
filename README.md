@@ -66,7 +66,9 @@ Results of our method trained on **Squat** and evaluated on **Jumpings Jack** co
 
 # Download the Data
 
-Our pre-trained models and synthetic data can be found [here](https://nextcloud.in.tum.de/index.php/s/RjdwM59XHAkWkMC).
+Our pre-trained models and synthetic data can be found [here](https://nextcloud.in.tum.de/index.php/s/RjdwM59XHAkWkMC) under `reproducing`.
+Also download the pre-trained weights for the normal net. They are found under `checkpoints`.
+These are then also put in `checkpoints` in the workspace folder.
 The password is fcanys2333.
 
 Unzip the synthetic.zip folder into `data/` and the outputs folder directly workspace folder.
@@ -258,7 +260,7 @@ python3 -m pip install pyrender
 python setup.py develop
 ```
 
-Convert Dataset into easymocap format (extri and intri still bugged):
+Convert Dataset into easymocap format:
 ```
 python scripts/convert_params.py -i data/Synthetic/first_trial/camera_info.json -o data/Synthetic/first_trial_easymocap -d data/Synthetic/first_trial -f 30
 ```
