@@ -58,6 +58,7 @@ def render_smpl_global_normal(dataroot, obj_path, faces_path, res=(1024, 1024), 
     parameter_path = os.path.join(dataroot)
     all_cam_parameters = load_parameters(parameter_path)
     obj_list = list(filter(lambda x : x.endswith(".obj"), os.listdir(obj_path)))
+    obj_list = sorted(obj_list, key=lambda x: int(x.split("_")[1][:-4]))
     obj = read_norm_smpl(os.path.join(obj_path, obj_list[0]), faces_path, flip_normal, init_rot)
     model = t3.Model(obj=obj, col_n=obj['vi'].shape[0])
     
@@ -76,6 +77,7 @@ def render_smpl_global_normal(dataroot, obj_path, faces_path, res=(1024, 1024), 
     scene.add_camera(camera)
     scene.init()
     for j, obj_name in tqdm(enumerate(obj_list)):
+        print(obj_path, obj_name)
         # if os.path.exists(pos_save_path) and len(os.listdir(os.path.join(pos_save_path))) == len(angles):
         #    continue
         obj = read_norm_smpl(os.path.join(obj_path, obj_name), faces_path, flip_normal, init_rot)

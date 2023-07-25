@@ -55,6 +55,7 @@ class SyntheticDataset(Dataset):
         self.frames = self.opt.train_frames if self.is_train else self.opt.val_frames
 
         self.num_sample_inout = self.opt.num_sample_inout
+        self.val_size = self.opt.val_size
 
         # PIL to tensor
         self.to_tensor = transforms.Compose([
@@ -72,6 +73,8 @@ class SyntheticDataset(Dataset):
         ])
 
     def __len__(self):
+        if not self.is_train and self.val_size > 0:
+            return self.val_size * len(self.subjects)
         return len(self.frames) * len(self.subjects)
 
     def visibility_sample(self, data_dict):
@@ -506,11 +509,11 @@ class SyntheticDataset(Dataset):
         data_dict = self.load_render_data(data_dict)
         data_dict = self.get_norm(data_dict)
 
-        # start = time.time()
+        #********** Comment out ********** 
         data_dict = self.select_sampling_method(data_dict)
         if self.phase != 'test':
             data_dict = self.visibility_sample(data_dict)
-        # print(f"Time for sampling: {time.time() - start}")
+        #*********************************
 
         # Warning dirty fix
         if self.SMPL.endswith('_pred'):
@@ -589,11 +592,11 @@ if __name__ == '__main__':
     # import ipdb; ipdb.set_trace()
     # t3_mesh = readobj("/Users/tonywang/Temp/cloth/Obj/person_0/merged/smplx_000000.obj")['vi'][:, :3]
     opt = parse_config()
-    opt.train_frames = list(range(0, 536))
+    opt.train_frames = list(range(44, 100))
     data = SyntheticDataset(opt, phase='train')
 
     for item in data:
         frame_id = item['frame_id']
         voxel_grid = item['vox'].squeeze(0).numpy()
 
-        np.save(f"data/Synthetic/easy/smpl_pred/person_0/voxel_grid/voxel_grid_{frame_id:06}.npy", voxel_grid)
+        np.save(f"data/Synthetic/jumping_jack/Obj/person_0/voxel_grid/voxel_grid_{frame_id:06}.npy", voxel_grid)

@@ -1,7 +1,7 @@
 # Overfits with ground truth data
-name: first_trial_coarse
+name: jumping_jacks_fine
 
-coarse_part: True
+fine_part: True
 infer: False
 
 # TRAINING PARAMETERS
@@ -11,29 +11,29 @@ batch_size: 1
 serial_batches: False
 pin_memory: False
 learning_rate: 1e-3
-num_epoch: 64
+num_epoch: 20
 
 val_size: 5
 val_type: "notmse"
 
 # DATASET PATH
-train_dataroot: data/Synthetic/first_trial
-val_dataroot: data/Synthetic/first_trial
+train_dataroot: data/Synthetic/jumping_jack
+val_dataroot: data/Synthetic/jumping_jack
 smpl_path: Obj
 obj_path: Obj
 loadSize: 512
 
 # DATASET PARAMETERS
-cameras: [0, 1, 2, 3]
+cameras: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28]
 random_multiview: False
 persons: [0]
-train_frames: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290, 300, 310, 320, 330, 340, 350, 360, 370, 380, 390, 400, 410, 420, 430, 440, 450, 460, 470, 480, 490, 500, 510, 520, 530]
-val_frames: [5, 25, 45, 65, 85, 105, 125, 145, 165, 185, 205, 225, 245, 265, 285, 305, 325, 345, 365, 385, 405, 425, 445, 465, 485, 505, 525, 545]
+train_frames: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100]
+val_frames: [17, 23, 27, 33, 37, 53, 57, 71, 75, 85, 89, 93, 95, 99]
 
 
 # SAMPLING RELATED
 sigma: 0.25 # Pertupation standard deviation for positions
-num_sample_inout: 12000
+num_sample_inout: 5000
 
 
 # network
