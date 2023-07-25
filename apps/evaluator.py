@@ -3,7 +3,8 @@ import trimesh.proximity
 import trimesh.sample
 import numpy as np
 import math
-import os, sys
+import os
+import sys
 from PIL import Image
 from tqdm import tqdm
 import open3d as o3d
@@ -318,7 +319,7 @@ def get_pifu_hd_configs(dataset, output_dir):
     human_paths = []
     cloth_paths = []
     # Define rotation (90 degrees about Z axis)
-    if output_dir.split('/')[-2] == "EASY_PIFU_HD_CAM_6":
+    if output_dir.split('/')[-2] == "PIFU_HD_CAM_6":
         rotation_matrix = trimesh.transformations.rotation_matrix(-0.3 * np.radians(90), [0, 1, 0])
     else:
         rotation_matrix = trimesh.transformations.rotation_matrix(np.radians(90), [0, 1, 0])
@@ -358,7 +359,8 @@ def get_pifu_hd_configs(dataset, output_dir):
 
 
 if __name__ == '__main__':
-    kwargs = get_pifu_hd_configs("squat", os.path.join("outputs", "EASY_PIFU_HD_CAM_6", "squat"))
+    cam = sys.argv[1]
+    kwargs = get_pifu_hd_configs("squat", os.path.join("outputs", f"PIFU_HD_CAM_{cam}", "squat"))
     evaluator = Evaluator(**kwargs)
 
     evaluator.get_chamfer_distance()

@@ -64,7 +64,99 @@ Results of our method trained on **Squat** and evaluated on **Jumpings Jack** co
 | Human | Squat     | Fine   |   5    |    -    | 0.025 |   -   |
 | Cloth | Squat     | Fine   |   5    |    -    | 0.016 |   -   |
 
+# Download the Data
 
+Our pre-trained models and synthetic data can be found [here](https://nextcloud.in.tum.de/index.php/s/RjdwM59XHAkWkMC).
+The password is fcanys2333.
+
+Unzip the synthetic.zip folder into `data/` and the outputs folder directly workspace folder.
+
+# Documentation of Dataset Structure
+
+All datasets (i.e., arm, jumping_jack, squat) follow the same data structure.
+
+```
+data/Synthetic
+├── arm # arm dataset
+├── jumping_jack # jumping jack dataset
+├── old_val # a dataset similar to jumping jack, not used
+├── old_val_easymocap # contains data used for easy mocap
+├── squat
+│   ├── Depth
+│   ├── Normal
+│   ├── Obj
+│   └── person_0
+│       ├── cloth # contains the cloth
+│       ├── combined # contains the cloth and human data
+│       ├── merged_2 # another variation we used for merging (not used)
+│       ├── smplx # the ground truth smpl_x files
+│       ├── smplx_no_cloth # the smplx_x files with only visible human shapes (only used for eval)
+│       └── voxel_grid # the voxel grid produced by binvox for the smplx input (used, since binxo gets stuck)
+│   ├── output_data.npz
+│   ├── RGB
+│   ├── scene_camera.json
+│   ├── Segmentation
+│   ├── smpl_pos # the smplx global normal maps
+│   └── smpl_pred # the smpl human mesh predicted using easy mocap (see later sections of this readme)
+└── squat_easymocap # contains data used for easy mocap
+
+```
+
+# Evaluation on our synthetic data:
+
+Evaluating the pre-trained models from the given outputs.zip folder.
+
+The output will be found in the folder specified in the `folder` flag under `folder/<your dataset>`.
+
+Evaluating the pre-trained coarse module on **Squat** dataset:
+```
+python apps/eval_3d.py --config configs/squat_coarse.yaml --val_size -1 --folder 07_19-01_22_15_SQUAT_COARSE
+```
+
+Evaluating the pre-trained fine module on **Squat** dataset:
+```
+python apps/eval_3d.py --config configs/squat_fine.yaml --val_size -1 --folder 07_19-15_26_36_SQUAT_FINE
+```
+
+Evaluating the pre-trained fine module on **Squat** dataset with only 2 cameras:
+```
+python apps/eval_3d.py --config configs/squat_fine.yaml --val_size -1 --folder 07_23-23_01_20_SQUAT_FINE_CAM_2 --cameras 6 28
+```
+
+Evaluating the pre-trained fine module on **Squat** dataset using the SMPL models predicted by EasyMocap:
+```
+python apps/eval_3d.py --config configs/squat_fine.yaml --val_size -1 --folder 07_20-22_49_16_SQUAT_FINE_PRED --smpl_path smpl_pred
+```
+
+Evaluating the pre-trained fine module on **Jumping Jack** dataset:
+```
+python apps/eval_3d.py --config configs/squat_fine.yaml --val_size -1 --folder 07_20-22_49_16_SQUAT_FINE_PRED --val_frames 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 --val_dataroot data/Synthetic/jumping_jack
+```
+
+Evaluating PIFuHD on camera 0:
+```
+python apps/evaluator.py 0
+```
+
+Evaluating PIfuHD on camera 6:
+```
+python apps/evaluator.py 6
+```
+
+----------------------------------------------------------------------------------------------------------
+
+The evaluation follows the following structure:
+
+Evaluating the coarse module on **Squat** dataset:
+
+```
+python apps/eval_3d.py --config configs/squat_coarse.yaml --val_size -1 --folder <the_output_folder_of_that_experiment> 
+```
+
+For other datasets proceed analogously.
+Other configurations like validation frames, validation cameras, resolution etc. can be adjusted with flags or in the configuration.
+
+The output will be found in the output folder.
 
 # Training on our synthetic data:
 
@@ -82,19 +174,6 @@ For the **arm** and **Jumping Jack** dataset proceed analogously.
 
 ⚠️ Note that due to hardware constraints we set epochs to 20 and num_points_inout <= 5000 (refer to the specific configs). 
 For better results you might want to increase these values.
-
-# Evaluation on our synthetic data:
-
-Evaluating the coarse module on **Squat** dataset:
-
-```
-python apps/eval_3d.py --config configs/squat_coarse.yaml --val_size -1 --folder <the_output_folder_of_that_experiment> 
-```
-
-For other datasets proceed analogously.
-Other configurations like validation frames, validation cameras, resolution etc. can be adjusted with flags or in the configuration.
-
-The output will be found in the output folder.
 
 
 # Generating Input for Synthetic Data
