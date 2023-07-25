@@ -31,16 +31,16 @@ As their code base is incomprehensive we additionally implement remaining code a
 
 Result on our **Squat** dataset. Green depicts the ground truth, red the result of the coarse module and blue the result of the fine module.
 
-<div style="text-align: center;">
-  ![Squat Results](assets/synthetic/squat.gif)
-</div>
+<p align="center">
+  <img src="assets/synthetic/squat.gif" />
+</p>
 
 
 Result on our **Jumping Jack** dataset. Again, green depicts the ground truth, red the resut  of the coarse module nand bluethe result of the fine module.
 
-<div style="text-align: center;">
-  ![Squat Results](assets/synthetic/jj.gif)
-</div>
+<p align="center">
+  <img src="assets/synthetic/jj.gif" />
+</p>
 
 ## Quantitative Results
 
