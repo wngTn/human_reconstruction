@@ -1,0 +1,53 @@
+# Overfits with ground truth data
+name: jumping_jacks_fine
+
+fine_part: True
+infer: False
+
+# TRAINING PARAMETERS
+gpu_ids: 0
+num_threads: 6
+batch_size: 1
+serial_batches: False
+pin_memory: False
+learning_rate: 1e-3
+num_epoch: 20
+
+val_size: 5
+val_type: "notmse"
+
+# DATASET PATH
+train_dataroot: data/Synthetic/jumping_jack
+val_dataroot: data/Synthetic/jumping_jack
+smpl_path: Obj
+obj_path: Obj
+loadSize: 512
+
+# DATASET PARAMETERS
+cameras: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28]
+random_multiview: False
+persons: [0]
+train_frames: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100]
+val_frames: [17, 23, 27, 33, 37, 53, 57, 71, 75, 85, 89, 93, 95, 99]
+
+
+# SAMPLING RELATED
+sigma: 0.25 # Pertupation standard deviation for positions
+num_sample_inout: 5000
+
+
+# network
+mlp_dim: [323, 1024, 512, 256, 128, 1]
+fine_mlp_dim: [355, 512, 256, 128, 1]
+
+# PLOTTING PARAMETERS
+freq_plot: 10 
+freq_save: 50
+freq_save_ply: 50
+freq_val: 5 # Epochs
+
+# PATHS
+load_netN_checkpoint_path: checkpoints/demo/netN_latest
+
+resolution: 512
+mc_threshold: 0.5
