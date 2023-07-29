@@ -342,3 +342,8 @@ python apps/eval_3d.py --config configs/multihuman_single.yaml --dataroot data/m
 
 5. Evaluation of baseline (Not published by the authors)
 
+# Contributors
+Tony Wang
+Yushan Zheng
+Michael Pabst
+
